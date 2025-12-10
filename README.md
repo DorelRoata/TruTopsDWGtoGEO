@@ -1,187 +1,469 @@
-# Laser Automation Project README
+# TruTops DWG to GEO Converter
 
-## Overview
-This project automates the workflow for importing DWG files (exported from SolidWorks with only cut and etch layers) into TrueTops 13 on Windows 11, processing them for TrueLaser 2030. The automation handles batch imports, screen highlighting, button clicks, and saving to GEO format. It uses Python for scripting to ensure repeatability and ease of use.
+A GUI automation tool that batch converts DWG files into GEO format for TrueTops/TrueLaser 2030 laser cutting software.
 
-This README compiles the prerequisites, process steps, setup instructions, and code outlines discussed in the development conversation. It serves as a complete guide to get started.
+**Goal**: Make the GEO process so simple that anyone can process a laser project, regardless of experience level.
 
-## Prerequisites
-- **SolidWorks Model**: Export the "bomb" file (e.g., the base model in bomb format) to the main project folder.
-- **Laser Files Folder**: Create a subfolder named `laser` in the main project folder.
-  - Export only the **cut layer** and **etch layer** from SolidWorks to DWG format.
-  - Do **not** include agitation layers, template layers, or any other extraneous elements. This keeps files clean for direct import into TrueTops without additional classification (no need for runtime layer detection in the DWG files).
-- **Software Environment**:
-  - TrueTops version 13 (older version, as specified).
-  - Windows 11 machine.
-  - Python 3.x installed.
-- **Folder Structure Example**:
-  ```
-  LaserProject/
-  ├── README.md (this file)
-  ├── bomb_file.sldprt (or similar SolidWorks bomb file)
-  ├── automate_laser.py (main script)
-  ├── coordinate_recorder.py (recording tool)
-  └── laser/
-      ├── part1.dwg
-      ├── part2.dwg
-      └── ...
-  ```
-- **Additional Notes from Discussion**:
-  - Files in `/laser` are pre-filtered: Only cut and etch layers, so TrueTops reads them directly.
-  - No bomb exit automation needed beyond standard SolidWorks close (File > Close or Ctrl+W), as the focus is on export and import.
+---
 
-## Automation Process
-The tool automates the following steps in TrueTops, based on the described workflow:
+## Time Savings Estimate
 
-1. **Manual Start**: User opens TrueTops and clicks the **Import** button to open the file selection dialog.
-2. **File Selection**: The script selects the first file in the `laser` folder (e.g., via Enter or click).
-3. **Import and Highlight**: After import completes, the script highlights an 800x600 pixel region in the center of the screen (to visually confirm the imported geometry—e.g., flash or draw a temporary overlay).
-4. **Save to GEO**: Clicks the **Save to Geo** button and confirms with **OK**.
-5. **Loop**: Repeats for the next file in the list until all files in the `laser` folder are processed.
-   - Auto-selects the next item in the import list (e.g., via Down arrow key).
-   - Re-highlights the screen region and saves.
+| Task | Manual Time | With This Tool | Savings |
+|------|-------------|----------------|---------|
+| GEO a single file | 20-60 sec | ~5 sec (automated) | 15-55 sec/file |
+| Sort files by material | 30-60 min | 2-3 min | 27-57 min |
+| **Large project (50+ parts)** | **2-4 hours** | **15-30 min** | **1.5-3.5 hours** |
 
-**Workflow Loop Visualization**:
-- Start: Import first file → Highlight center (800x600) → Save to Geo → OK.
-- Repeat: Down to next file → Import → Highlight → Save to Geo → OK.
-- End: All files processed.
+---
 
-This ensures batch processing without manual intervention after the initial import click.
+## Complete Workflow Overview
 
-## Setup Instructions
-1. **Install Dependencies**:
-   - Ensure Python is installed (download from python.org if needed).
-   - Open Command Prompt and run:
-     ```
-     pip install pyautogui opencv-python pillow
-     ```
-     - `pyautogui`: For mouse clicks, keyboard inputs, screen grabs, highlighting, and coordinate recording.
-     - `opencv-python`: For image recognition (matching button screenshots in general areas to handle UI variations).
-     - `pillow`: For image handling (screenshots and overlays).
-
-2. **Record Coordinates for Accuracy** (One-Time Setup, as Discussed):
-   - To ensure precise button selection, record your first manual run.
-   - Create a `screenshots` subfolder for button images (e.g., "Save to Geo" and "OK").
-   - The automation searches around recorded coordinates for visual matches, avoiding hardcoding that could break with window resizing.
-
-3. **Run the Automation**:
-   - Place your files in the structure above.
-   - Run the main script: `python automate_laser.py`.
-   - Follow on-screen prompts to start the import loop (e.g., confirm TrueTops is open and Import dialog is ready).
-
-## Recording Script (coordinate_recorder.py)
-Use this to capture clicks for the first run. Save as `coordinate_recorder.py` and run it (`python coordinate_recorder.py`). It polls mouse position every 0.5 seconds—move your mouse over buttons and note the printed X,Y coords. Stop with Ctrl+C.
-
-```python
-import pyautogui
-import time
-
-print("Click recording started. Perform your first import steps slowly.")
-print("Move mouse over buttons/areas and note positions. Press Ctrl+C to stop.")
-
-try:
-    while True:
-        x, y = pyautogui.position()
-        print(f"Current position: X={x}, Y={y}")
-        time.sleep(0.5)  # Poll every 0.5 seconds
-except KeyboardInterrupt:
-    print("Recording stopped. Use the positions for your script.")
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           LASER PROJECT WORKFLOW                                 │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  STEP 1: SolidWorks Setup                                                       │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │  Export BOM (Bill of Materials)                                          │   │
+│  │  • File Name | Material | Quantity                                       │   │
+│  │  • Save as CSV or Excel                                                  │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                              ▼                                                   │
+│  STEP 2: SolidWorks DWG Export                                                  │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │  Export DWGs with ONLY:                                                  │   │
+│  │  • Cut Layer (geometry to be cut)                                        │   │
+│  │  • Etch Layer (text/markings to be etched)                              │   │
+│  │  • NO other layers (agitation, templates, dimensions, etc.)             │   │
+│  │  • Save all to /laser folder                                            │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                              ▼                                                   │
+│  STEP 3: Material Organizer (This Tool)                                         │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │  • Load BOM file                                                         │   │
+│  │  • Select material type to process                                       │   │
+│  │  • Tool copies matching DWGs to material-specific folders               │   │
+│  │  • Example: /laser/A36_Steel/, /laser/304_SS/, etc.                     │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                              ▼                                                   │
+│  STEP 4: DWG to GEO Conversion (This Tool)                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │  • Select material folder                                                │   │
+│  │  • Open TrueTops Import dialog                                           │   │
+│  │  • Click START - tool processes all files automatically                 │   │
+│  │  • GEO files ready for laser programming                                │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                              ▼                                                   │
+│  STEP 5: Laser Programming                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │  • GEO files ready in TrueTops                                          │   │
+│  │  • Program nesting, cutting parameters, etc.                            │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Steps to Record** (as Discussed):
-  1. Start TrueTops, click Import (note position for script fallback).
-  2. Select first file in list (note list item position).
-  3. After import, move mouse to center of highlight area (for 800x600 box).
-  4. Hover/click "Save to Geo" (take screenshot: Print Screen > Crop > Save as PNG).
-  5. Hover/click "OK" (take screenshot).
-  6. Note position for next file selection (e.g., Down arrow target).
-  7. Stop recording and update the main script with these coords/images.
+---
 
-**Pro Tip**: Screenshots help with visual matching—script scans ~50-100 pixel radius around coords for the button image.
+## Pre-Requirements (SolidWorks Setup)
 
-## Main Automation Script (automate_laser.py)
-Starter script based on the workflow. Customize with your recorded coordinates and button images. Save as `automate_laser.py`.
+Before using this tool, you must prepare your SolidWorks project correctly. This is **critical** for the automation to work.
 
-```python
-import pyautogui
-import os
-import time
-from PIL import Image
+### 1. Export the BOM (Bill of Materials)
 
-# Safety: Move mouse to top-left to abort
-pyautogui.FAILSAFE = True
+The BOM file tells the tool which files belong to which material.
 
-# Configuration (Update with recordings)
-LASER_FOLDER = 'laser'
-SCREEN_WIDTH, SCREEN_HEIGHT = pyautogui.size()
-HIGHLIGHT_X, HIGHLIGHT_Y = SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2  # Center start
-HIGHLIGHT_WIDTH, HIGHLIGHT_HEIGHT = 800, 600
-SAVE_GEO_BUTTON_IMG = 'screenshots/save_to_geo.png'  # Your screenshot
-OK_BUTTON_IMG = 'screenshots/ok.png'
-# Fallback coords (replace with recordings)
-SAVE_GEO_X, SAVE_GEO_Y = 500, 300  # Example
-OK_X, OK_Y = 600, 400
+**Required columns:**
+| Column | Description | Example |
+|--------|-------------|---------|
+| File Name | DWG filename (without extension) | `BRACKET-001` |
+| Material | Material specification | `A36 Steel`, `304 SS`, `AL 6061` |
+| Quantity | Number of parts needed | `4` |
 
-# Get list of files
-files = [f for f in os.listdir(LASER_FOLDER) if f.endswith('.dwg')]
-files.sort()  # Alphabetical order
-print(f"Found {len(files)} files to process.")
+**How to export from SolidWorks:**
+1. Open your assembly in SolidWorks
+2. Go to **File > Save As**
+3. Select **Save as type: Excel (*.xlsx)** or **CSV (*.csv)**
+4. In the BOM options, ensure these columns are included:
+   - Part Number / File Name
+   - Material
+   - Quantity
+5. Save to your project folder as `BOM.xlsx` or `BOM.csv`
 
-# Assume user has clicked Import and file list is open
-input("Press Enter when Import dialog is open and ready...")
-for i, file in enumerate(files):
-    print(f"Processing {file} ({i+1}/{len(files)})...")
-    
-    # Select file (for first: Enter; others: Down + Enter)
-    if i > 0:
-        pyautogui.press('down')  # Move to next in list
-        time.sleep(0.5)
-    pyautogui.press('enter')  # Select/Import
-    time.sleep(3)  # Wait for import to load (adjust as needed)
-    
-    # Highlight screen region (move cursor + optional screenshot flash)
-    pyautogui.moveTo(HIGHLIGHT_X, HIGHLIGHT_Y)
-    # Optional: Take and display screenshot for visual confirm (uncomment)
-    # screenshot = pyautogui.screenshot(region=(HIGHLIGHT_X - HIGHLIGHT_WIDTH//2, HIGHLIGHT_Y - HIGHLIGHT_HEIGHT//2, HIGHLIGHT_WIDTH, HIGHLIGHT_HEIGHT))
-    # screenshot.show()  # Pops up image briefly
-    print("Highlighted center region (800x600).")
-    time.sleep(1)
-    
-    # Click Save to Geo (prefer image match, fallback coord)
-    button_location = pyautogui.locateOnScreen(SAVE_GEO_BUTTON_IMG, confidence=0.8)
-    if button_location:
-        pyautogui.click(pyautogui.center(button_location))
-        print("Clicked Save to Geo via image match.")
-    else:
-        pyautogui.click(SAVE_GEO_X, SAVE_GEO_Y)
-        print("Clicked Save to Geo via fallback coord.")
-    time.sleep(1)
-    
-    # Click OK (same logic)
-    button_location = pyautogui.locateOnScreen(OK_BUTTON_IMG, confidence=0.8)
-    if button_location:
-        pyautogui.click(pyautogui.center(button_location))
-        print("Clicked OK via image match.")
-    else:
-        pyautogui.click(OK_X, OK_Y)
-        print("Clicked OK via fallback coord.")
-    time.sleep(2)  # Wait for save to complete
-
-print("All files processed! Check TrueTops for GEO outputs.")
+**Example BOM:**
+```
+File Name         | Material      | Qty
+------------------|---------------|----
+FRAME-BASE-001    | SS 11GA       | 1
+BRACKET-LEFT-002  | SS 14GA       | 2
+BRACKET-RIGHT-003 | SS 14GA       | 2
+COVER-PLATE-004   | SS 16GA       | 1
+GUARD-PANEL-005   | SS 7GA        | 4
+SPACER-006        | UHMW          | 8
+SLIDE-PLATE-007   | HDPE          | 2
+MOUNT-PLATE-008   | SS 11GA       | 2
 ```
 
-- **Notes on Script** (from Discussion):
-  - **Button Selection**: Uses visual understanding (OpenCV image match) around general areas + fallbacks for reliability.
-  - **Highlighting**: Simple cursor move for now; enhance with overlay if needed (e.g., draw rectangle via PIL).
-  - **Loop Handling**: Assumes file list stays open; test for dialog refreshes.
-  - **Error Handling**: Add try/except for locateOnScreen failures. Use `time.sleep()` for timing—tune based on machine speed.
-  - **Testing**: Run on sample files first. If TrueTops crashes, add longer sleeps.
+**Common Materials:**
+| Material | Description |
+|----------|-------------|
+| SS 7GA   | Stainless Steel 7 Gauge (.1875") |
+| SS 11GA  | Stainless Steel 11 Gauge (.1196") |
+| SS 14GA  | Stainless Steel 14 Gauge (.0747") |
+| SS 16GA  | Stainless Steel 16 Gauge (.0598") |
+| UHMW     | Ultra-High Molecular Weight Polyethylene |
+| HDPE     | High-Density Polyethylene |
 
-## Potential Improvements
-- **GUI Wrapper**: Use `tkinter` for start/stop buttons and progress display.
-- **Advanced Input**: `pynput` for better mouse/keyboard if pyautogui limits arise.
-- **Layer Validation**: Optional script to verify DWG layers pre-import (using e.g., `ezdxf` library if added).
-- **Version Control**: Git this project; track coord changes if UI updates.
-- **Conversation Insights**: Focused on visual/recording for accuracy over hardcoding; no DWG parsing needed due to pre-export filtering.
+### 2. Export DWGs with Correct Layers
 
-If you need tweaks, more code (e.g., full GUI), or help debugging, let me know! Save this as `README.md` in your project root.
+**CRITICAL: Only export these layers:**
+
+| Layer | Purpose | Include? |
+|-------|---------|----------|
+| **Cut Layer** | Geometry to be laser cut | YES |
+| **Etch Layer** | Text/markings to be laser etched | YES |
+| Agitation Layer | Internal features | NO |
+| Template Layer | Drawing templates | NO |
+| Dimension Layer | Dimensions/annotations | NO |
+| Construction Layer | Reference geometry | NO |
+| Any other layers | - | NO |
+
+**Why this matters:**
+- Clean DWGs import directly into TrueTops without manual layer cleanup
+- No need to delete unwanted geometry in TrueTops
+- Faster processing, fewer errors
+- Enables full automation
+
+**How to export from SolidWorks:**
+1. Open the part/drawing
+2. Go to **File > Save As**
+3. Select **Save as type: DWG (*.dwg)**
+4. Click **Options**
+5. In layer mapping, ensure only Cut and Etch layers are exported
+6. Save to the `laser/` folder
+
+### 3. Folder Structure
+
+After exporting, your project should look like this:
+
+```
+YourProject/
+├── BOM.xlsx                    # Bill of Materials export
+├── Assembly.sldasm             # SolidWorks assembly (optional)
+└── laser/                      # ALL DWG exports go here
+    ├── FRAME-BASE-001.dwg      # SS 11GA
+    ├── BRACKET-LEFT-002.dwg    # SS 14GA
+    ├── BRACKET-RIGHT-003.dwg   # SS 14GA
+    ├── COVER-PLATE-004.dwg     # SS 16GA
+    ├── GUARD-PANEL-005.dwg     # SS 7GA
+    ├── SPACER-006.dwg          # UHMW
+    ├── SLIDE-PLATE-007.dwg     # HDPE
+    └── MOUNT-PLATE-008.dwg     # SS 11GA
+```
+
+---
+
+## Features
+
+### Current Features
+- **Simple GUI Interface** - No command-line knowledge required
+- **Batch Processing** - Process multiple DWG files automatically
+- **Reliable Button Detection** - Multiple strategies ensure buttons are always found
+- **Progress Tracking** - Visual progress bar and file status
+- **Resume Capability** - Continue from where you left off after interruption
+- **Dry Run Mode** - Test the workflow without actually clicking
+
+### Planned Features
+- **BOM Import** - Load Excel/CSV BOM files
+- **Material Organizer** - Sort files into folders by material type
+- **Material Selection** - Choose which material to process
+- **Quantity Display** - Show part quantities from BOM
+
+---
+
+## Usage Guide
+
+### First-Time Setup (One Time Only)
+
+Before processing files, you need to capture the button images:
+
+1. **Open TrueTops** and navigate to where the "Save to Geo" and "OK" buttons are visible
+2. **Launch the app** and click **"Setup Buttons"**
+3. **Capture each button**:
+   - Click "Capture" next to "Save to Geo"
+   - You have 5 seconds to click on the button in TrueTops
+   - The tool captures a screenshot of that button
+   - Repeat for the "OK" button
+4. **Save** your configuration
+
+This only needs to be done once (unless TrueTops UI changes).
+
+### Processing Files (Daily Use)
+
+1. **Prepare your files**:
+   - Export BOM from SolidWorks
+   - Export DWGs with only Cut and Etch layers
+   - Place all DWG files in the `laser/` folder
+
+2. **Open TrueTops**:
+   - Click the Import button
+   - Navigate to your `laser/` folder
+   - Make sure the file list is visible
+
+3. **Start the automation**:
+   - Launch `app.py`
+   - Verify the file list shows your DWG files
+   - Click **START**
+   - Don't touch the mouse/keyboard until complete
+
+4. **Monitor progress**:
+   - Watch the progress bar
+   - Each file shows status indicators
+   - Status messages show what's happening
+
+### Tips for Best Results
+
+- **Don't move TrueTops** window during processing
+- **Keep the Import dialog open** throughout the batch
+- **Use consistent DWG exports** - same layers, same settings
+- **Test with Dry Run** first to verify timing
+- **Export BOM first** before exporting DWGs (ensures names match)
+
+---
+
+## GUI Overview
+
+### Main Window
+
+```
+┌─────────────────────────────────────────────────────┐
+│  TruTops DWG to GEO Converter                    [X]│
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  Laser Folder: [  laser/                  ] [Browse]│
+│                                                     │
+│  Files Found: 12 DWG files                          │
+│  ┌─────────────────────────────────────────────┐   │
+│  │ [Done] FRAME-BASE-001.dwg                   │   │
+│  │ [Done] BRACKET-LEFT-002.dwg                 │   │
+│  │ > BRACKET-RIGHT-003.dwg  <- Processing      │   │
+│  │   COVER-PLATE-004.dwg                       │   │
+│  │   ...                                       │   │
+│  └─────────────────────────────────────────────┘   │
+│                                                     │
+│  Status: Processing BRACKET-RIGHT-003.dwg...        │
+│  Progress: [████████░░░░░░░░░░░░] 3/12              │
+│                                                     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
+│  │  START   │  │   STOP   │  │  SETUP BUTTONS   │  │
+│  └──────────┘  └──────────┘  └──────────────────┘  │
+│                                                     │
+│  [  ] Dry Run (simulate without clicking)          │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+### Material Organizer (Planned)
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Material Organizer                              [X]│
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  BOM File: [ BOM.xlsx                    ] [Browse] │
+│                                                     │
+│  Materials Found:                                   │
+│  ┌─────────────────────────────────────────────┐   │
+│  │ [x] SS 11GA           (3 files, 4 parts)    │   │
+│  │ [ ] SS 14GA           (2 files, 4 parts)    │   │
+│  │ [ ] SS 16GA           (1 file,  1 part)     │   │
+│  │ [ ] SS 7GA            (1 file,  4 parts)    │   │
+│  │ [ ] UHMW              (1 file,  8 parts)    │   │
+│  │ [ ] HDPE              (1 file,  2 parts)    │   │
+│  └─────────────────────────────────────────────┘   │
+│                                                     │
+│  Output Folder: [ laser/SS_11GA/         ] [Browse] │
+│                                                     │
+│  ┌─────────────────────────┐                       │
+│  │  COPY SELECTED FILES    │                       │
+│  └─────────────────────────┘                       │
+│                                                     │
+│  Status: Ready                                      │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## Detailed Time Savings Analysis
+
+### Manual Process (Without This Tool)
+
+**For a project with 50 DWG files:**
+
+| Step | Time per File | Total Time |
+|------|---------------|------------|
+| Open file in TrueTops | 10 sec | 8 min |
+| Navigate menus | 5 sec | 4 min |
+| Click Save to GEO | 5 sec | 4 min |
+| Confirm dialogs | 5 sec | 4 min |
+| Wait for save | 5 sec | 4 min |
+| **Subtotal (GEO only)** | **30 sec** | **25 min** |
+| Sort files by material | - | **30-60 min** |
+| **TOTAL** | - | **55-85 min** |
+
+*Note: Complex files requiring mirroring or text editing take 45-60 seconds each.*
+
+### Automated Process (With This Tool)
+
+**For the same 50-file project:**
+
+| Step | Time |
+|------|------|
+| Load BOM and organize by material | 2-3 min |
+| Start automation | 30 sec |
+| Automated GEO processing (50 files @ 5 sec) | ~4 min |
+| **TOTAL** | **~7-8 min** |
+
+### Savings Summary
+
+| Project Size | Manual Time | Automated Time | Time Saved |
+|--------------|-------------|----------------|------------|
+| Small (10 parts) | 15-20 min | 3-4 min | 12-16 min |
+| Medium (30 parts) | 35-50 min | 5-6 min | 30-44 min |
+| Large (50+ parts) | 55-85 min | 7-8 min | 48-77 min |
+| XL (100+ parts) | 2-3 hours | 12-15 min | 1.75-2.75 hours |
+
+**Additional Benefits:**
+- Reduced errors from manual clicking
+- Consistent processing (no missed files)
+- Anyone can run the process (no training required)
+- Free up skilled programmers for actual laser programming
+
+---
+
+## Configuration
+
+Settings are saved in `config.json` (auto-created):
+
+```json
+{
+  "laser_folder": "laser",
+  "import_delay": 3.0,
+  "save_delay": 2.0,
+  "buttons": {
+    "save_to_geo": {
+      "image": "screenshots/save_to_geo.png",
+      "fallback_coords": [500, 300]
+    },
+    "ok": {
+      "image": "screenshots/ok.png",
+      "fallback_coords": [600, 400]
+    }
+  },
+  "last_processed_index": 0
+}
+```
+
+### Adjustable Timings
+
+If TrueTops is slow, increase the delays in `config.json`:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `import_delay` | 3.0 sec | Wait after pressing Enter to import |
+| `save_delay` | 2.0 sec | Wait after clicking OK to save |
+
+---
+
+## Troubleshooting
+
+### "Button not found" error
+
+1. **Re-capture the button** - UI may have changed
+2. **Check screenshot quality** - Ensure `screenshots/` folder has clear images
+3. **Verify TrueTops window** - Make sure buttons are visible on screen
+4. **Check screen resolution** - Buttons may look different on different monitors
+
+### Processing stops mid-batch
+
+1. **Check TrueTops** - May have shown an error dialog
+2. **Resume processing** - The tool saves progress, just click START again
+3. **Increase delays** - If timing issues, edit `config.json`
+
+### Files not appearing in list
+
+1. **Check file extension** - Must be `.dwg` (case insensitive)
+2. **Verify folder path** - Ensure files are in the correct folder
+3. **Refresh** - Click Browse and re-select the folder
+
+### DWG has unwanted geometry in TrueTops
+
+1. **Check SolidWorks export settings** - Only Cut and Etch layers should be exported
+2. **Re-export the DWG** with correct layer settings
+3. **Verify layer names** in SolidWorks match your export filter
+
+---
+
+## Safety Features
+
+- **Failsafe**: Move mouse to top-left corner to abort immediately
+- **Dry Run**: Test without clicking (checkbox in main window)
+- **Progress Save**: Interrupted batches can be resumed
+- **User Alerts**: Pauses and asks for help if buttons can't be found
+- **Non-Destructive**: Original DWG files are never modified
+
+---
+
+## Project Structure
+
+```
+TruTopsDWGtoGEO/
+├── README.md               # This documentation
+├── app.exe                 # Main application
+├── config.json             # Settings (auto-generated)
+├── screenshots/            # Button images (auto-created)
+│   ├── save_to_geo.png
+│   └── ok.png
+└── laser/                  # Your DWG files go here
+    ├── SS_7GA/             # Material-specific subfolders
+    ├── SS_11GA/
+    ├── SS_14GA/
+    ├── SS_16GA/
+    ├── UHMW/
+    ├── HDPE/
+    └── *.dwg
+```
+
+---
+
+## Roadmap
+
+### Phase 1 (Current)
+- [x] Basic GUI application
+- [x] Button capture and detection
+- [x] Automated DWG to GEO conversion
+- [x] Progress tracking and resume
+
+### Phase 2 (Next)
+- [ ] BOM file import (Excel/CSV)
+- [ ] Material organizer
+- [ ] File copying by material
+- [ ] Quantity display
+
+### Phase 3 (Future)
+- [ ] Mirror detection/automation
+- [ ] Text editing assistance
+- [ ] Batch reporting
+- [ ] Integration with laser programming
+
+---
+
+## License
+
+This project is provided as-is for internal use.
+
+## Support
+
+For issues or feature requests, please open an issue on GitHub.
