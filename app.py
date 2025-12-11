@@ -26,17 +26,11 @@ DEFAULT_CONFIG = {
     "save_delay": 2.0,
     "trutops_window_title": "TruTops",  # Window title to focus
     "click_locations": {
-        "file_list": None,           # Where to click to focus file list in Open dialog
-        "no_save": [692, 711],       # "No" button when asked to save modifications
-        "select_top_left": None,     # Top-left corner of selection box
-        "select_bottom_right": None, # Bottom-right corner of selection box
-        "deselect": None,            # Click to deselect
-    },
-    "buttons": {
-        "save_selected": {
-            "image": "ScreenShots/Save Selection.png",
-            "fallback_coords": None
-        },
+        "no_save": [3009, 672],              # "No" button - don't save modifications
+        "file_list": [2690, 667],            # Click to focus file list in Open dialog
+        "save_selected": [680, 126],         # Save Selected to GEO button
+        "select_top_left": [75, 209],        # Top-left corner of selection box
+        "select_bottom_right": [3350, 1867], # Bottom-right corner of selection box
     },
     "last_processed_index": 0
 }
@@ -225,11 +219,11 @@ class LocationSetupDialog(tk.Toplevel):
         self.grab_set()
 
         self.locations = {
-            "file_list": ("File List (in Open dialog)", "Click on the file list area"),
-            "no_save": ("No Button (save dialog)", "Click 'No' when asked to save"),
+            "no_save": ("No Button", "Click 'No' when asked to save modifications"),
+            "file_list": ("File List", "Click to focus file list in Open dialog"),
+            "save_selected": ("Save Selected", "Click 'Save Selected to GEO' button"),
             "select_top_left": ("Selection Top-Left", "Click TOP-LEFT corner of part"),
             "select_bottom_right": ("Selection Bottom-Right", "Click BOTTOM-RIGHT corner"),
-            "deselect": ("Deselect Button", "Click to deselect"),
         }
 
         self.captured = {}
@@ -491,11 +485,12 @@ class AutomationRunner:
         import_delay = self.config.get("import_delay") or 3.0
         save_delay = self.config.get("save_delay") or 2.0
 
-        file_list_pos = self.config.get("click_locations", "file_list")
+        # Get all click locations
         no_save_pos = self.config.get("click_locations", "no_save")
+        file_list_pos = self.config.get("click_locations", "file_list")
+        save_selected_pos = self.config.get("click_locations", "save_selected")
         select_tl_pos = self.config.get("click_locations", "select_top_left")
         select_br_pos = self.config.get("click_locations", "select_bottom_right")
-        deselect_pos = self.config.get("click_locations", "deselect")
 
         total = len(self.files)
 
@@ -526,59 +521,59 @@ class AutomationRunner:
                 print("\n--- File {}/{}: {} ---".format(i + 1, total, file))
 
                 # Step 1: Open Drawing (Ctrl+O)
-                self._hotkey('ctrl', 'o', description="Open Drawing")
+                self._hotkey('ctrl', 'o', description="Open Drawing shortcut")
                 time.sleep(1.0)
 
                 if not self.running:
                     break
 
-                # Step 2: Navigate to file
+                # Step 2: Click "No" - don't save modifications
+                if no_save_pos:
+                    self._click(no_save_pos[0], no_save_pos[1], "No (don't save)")
+                    time.sleep(0.5)
+
+                # Step 3: Click file list to focus
                 if file_list_pos:
                     self._click(file_list_pos[0], file_list_pos[1], "Focus file list")
                     time.sleep(0.3)
 
+                # Step 4: Move to next file (skip for first file)
                 if i > 0:
                     self._press('down', "Next file")
                     time.sleep(0.2)
 
-                self._press('enter', "Open file")
+                # Step 5: Open drawing
+                self._press('enter', "Open drawing")
                 time.sleep(1.0)
 
-                # Step 2b: Click "No" when asked to save modifications
-                if no_save_pos:
-                    self._click(no_save_pos[0], no_save_pos[1], "No (don't save)")
-                    time.sleep(import_delay)
+                # Step 6: Confirm import settings
+                self._press('enter', "Confirm import settings")
+                time.sleep(import_delay)
 
                 if not self.running:
                     break
 
-                # Step 3: Save Selected
-                if not self._click_button_by_image("save_selected", "Save Selected"):
-                    self.app.after(0, lambda: messagebox.showerror(
-                        "Error", "Could not find Save Selected button"))
-                    self.running = False
-                    break
-                time.sleep(0.5)
+                # Step 7: Click Save Selected to GEO
+                if save_selected_pos:
+                    self._click(save_selected_pos[0], save_selected_pos[1], "Save Selected to GEO")
+                    time.sleep(0.5)
 
-                if not self.running:
-                    break
-
-                # Step 4: Select part (click top-left, then bottom-right)
+                # Step 8: Click top-left corner of selection box
                 if select_tl_pos:
                     self._click(select_tl_pos[0], select_tl_pos[1], "Selection top-left")
                     time.sleep(0.3)
 
+                # Step 9: Click bottom-right corner of selection box
                 if select_br_pos:
                     self._click(select_br_pos[0], select_br_pos[1], "Selection bottom-right")
                     time.sleep(0.5)
 
-                # Step 5: Deselect
-                if deselect_pos:
-                    self._click(deselect_pos[0], deselect_pos[1], "Deselect")
-                    time.sleep(0.5)
+                # Step 10: Enter for warning dialog (may not appear, but safe to press)
+                self._press('enter', "Warning dialog (if any)")
+                time.sleep(0.3)
 
-                # Step 6: Enter to save
-                self._press('enter', "Save")
+                # Step 11: Enter to save file
+                self._press('enter', "Save file")
                 time.sleep(save_delay)
 
                 # Mark complete
@@ -708,8 +703,9 @@ class App(tk.Tk):
 
         ttk.Label(
             info_frame,
-            text="1. Ctrl+O  2. Select file  3. 'No' (don't save)\n"
-                 "4. Save Selected  5. Select TL+BR  6. Deselect  7. Enter",
+            text="1. Ctrl+O  2. No  3. File list  4. Down  5. Enter (open)\n"
+                 "6. Enter (import)  7. Save Selected  8. TL  9. BR\n"
+                 "10. Enter (warning)  11. Enter (save)",
             font=("Consolas", 9), foreground="gray"
         ).pack(anchor="w")
 
@@ -750,7 +746,7 @@ class App(tk.Tk):
             return
 
         # Check locations
-        required = ["file_list", "select_top_left", "select_bottom_right", "deselect"]
+        required = ["no_save", "file_list", "save_selected", "select_top_left", "select_bottom_right"]
         missing = [loc for loc in required if not self.config.get("click_locations", loc)]
 
         if missing:
