@@ -4,24 +4,24 @@
   "trutops_window_title": "",
   "click_locations": {
     "open_drawing": [
-      2760,
-      2118
+      610,
+      124
     ],
     "no_save": [
-      3166,
-      820
+      3030,
+      678
     ],
     "save_selected": [
-      2727,
-      2107
+      756,
+      127
     ],
     "select_top_left": [
-      2770,
-      2129
+      150,
+      212
     ],
     "select_bottom_right": [
-      2273,
-      792
+      3338,
+      1861
     ],
     "file_list": [
       2697,
@@ -36,7 +36,7 @@
       2136
     ]
   },
-  "last_processed_index": 4,
+  "last_processed_index": 0,
   "buttons": {
     "save_selected": {
       "image": "ScreenShots/Save Selection.png",
