@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 TruTops DWG to GEO Converter
 A GUI automation tool for batch converting DWG files to GEO format.
@@ -23,6 +24,12 @@ DEFAULT_CONFIG = {
     "laser_folder": "laser",
     "import_delay": 3.0,
     "save_delay": 2.0,
+    "click_locations": {
+        "file_list": None,        # Where to click to focus file list in Open dialog
+        "save_selected": None,    # Save Selected button
+        "working_area": None,     # Click to highlight working area
+        "deselect": None,         # Click to deselect
+    },
     "buttons": {
         "save_to_geo": {
             "image": "screenshots/save_to_geo.png",
@@ -38,6 +45,78 @@ DEFAULT_CONFIG = {
 
 CONFIG_FILE = "config.json"
 SCREENSHOTS_DIR = "screenshots"
+
+
+class ClickIndicator:
+    """Shows a yellow circle where clicks happen."""
+
+    def __init__(self):
+        self.overlay = None
+        self.canvas = None
+
+    def show_at(self, x, y, duration=0.3):
+        """Show yellow circle at position for duration seconds."""
+        def _show():
+            # Create overlay window
+            self.overlay = tk.Tk()
+            self.overlay.overrideredirect(True)
+            self.overlay.attributes('-topmost', True)
+            self.overlay.attributes('-transparentcolor', 'black')
+            self.overlay.configure(bg='black')
+
+            # Size and position
+            size = 50
+            self.overlay.geometry("{}x{}+{}+{}".format(
+                size, size, x - size // 2, y - size // 2
+            ))
+
+            # Draw yellow circle
+            self.canvas = tk.Canvas(
+                self.overlay,
+                width=size,
+                height=size,
+                bg='black',
+                highlightthickness=0
+            )
+            self.canvas.pack()
+            self.canvas.create_oval(
+                5, 5, size - 5, size - 5,
+                outline='yellow',
+                width=4
+            )
+
+            # Auto-close after duration
+            self.overlay.after(int(duration * 1000), self._close)
+            self.overlay.mainloop()
+
+        # Run in separate thread to not block
+        threading.Thread(target=_show, daemon=True).start()
+
+    def _close(self):
+        """Close the overlay."""
+        if self.overlay:
+            self.overlay.destroy()
+            self.overlay = None
+
+
+def click_with_indicator(x, y, indicator=None):
+    """Click at position and show yellow indicator."""
+    if indicator:
+        indicator.show_at(x, y)
+    time.sleep(0.1)  # Brief pause for indicator to appear
+    pyautogui.click(x, y)
+
+
+def press_with_log(key, description=""):
+    """Press a key and log the action."""
+    print("[KEY] {} - {}".format(key, description))
+    pyautogui.press(key)
+
+
+def hotkey_with_log(keys, description=""):
+    """Press hotkey combination and log the action."""
+    print("[HOTKEY] {} - {}".format("+".join(keys), description))
+    pyautogui.hotkey(*keys)
 
 
 class Config:
@@ -75,9 +154,9 @@ class Config:
         """Get a nested config value."""
         value = self.data
         for key in keys:
-            value = value.get(key)
             if value is None:
                 return None
+            value = value.get(key) if isinstance(value, dict) else None
         return value
 
     def set(self, *keys_and_value):
@@ -100,7 +179,7 @@ class ButtonDetector:
         Try multiple strategies to find a button on screen.
         Returns (center_point, strategy_name) or (None, "Not found").
         """
-        if not os.path.exists(image_path):
+        if not image_path or not os.path.exists(image_path):
             if fallback_coords:
                 return tuple(fallback_coords), "Saved coordinates (no image)"
             return None, "Not found (no image file)"
@@ -134,26 +213,26 @@ class ButtonDetector:
         return None, "Not found"
 
 
-class ButtonSetupDialog(tk.Toplevel):
-    """Dialog for capturing button screenshots."""
+class LocationSetupDialog(tk.Toplevel):
+    """Dialog for capturing click locations."""
 
     def __init__(self, parent, config):
         super().__init__(parent)
         self.config = config
-        self.title("Button Setup")
-        self.geometry("450x350")
+        self.title("Setup Click Locations")
+        self.geometry("500x500")
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
 
-        # Ensure screenshots directory exists
-        os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
-
-        self.captured = {
-            "save_to_geo": False,
-            "ok": False
+        self.locations = {
+            "file_list": ("File List (in Open dialog)", "Click on the file list area"),
+            "save_selected": ("Save Selected Button", "Click the Save Selected button"),
+            "working_area": ("Working Area", "Click to highlight working area"),
+            "deselect": ("Deselect Button", "Click to deselect"),
         }
 
+        self.captured = {}
         self._create_widgets()
         self._update_status()
 
@@ -165,41 +244,34 @@ class ButtonSetupDialog(tk.Toplevel):
 
         ttk.Label(
             instr_frame,
-            text="1. Open TrueTops and make the buttons visible\n"
-                 "2. Click CAPTURE, then click the button in TrueTops\n"
-                 "3. You have 5 seconds to click after pressing CAPTURE",
-            wraplength=400
+            text="Click CAPTURE for each location, then click the corresponding\n"
+                 "button/area in TrueTops within 5 seconds.",
+            wraplength=450
         ).pack()
 
-        # Save to Geo button capture
-        geo_frame = ttk.LabelFrame(self, text="Save to Geo Button", padding=10)
-        geo_frame.pack(fill="x", padx=10, pady=5)
+        # Location captures
+        self.status_labels = {}
+        self.capture_buttons = {}
 
-        geo_row = ttk.Frame(geo_frame)
-        geo_row.pack(fill="x")
+        for key, (name, desc) in self.locations.items():
+            frame = ttk.LabelFrame(self, text=name, padding=10)
+            frame.pack(fill="x", padx=10, pady=5)
 
-        self.geo_capture_btn = ttk.Button(
-            geo_row, text="CAPTURE", command=lambda: self._start_capture("save_to_geo")
-        )
-        self.geo_capture_btn.pack(side="left", padx=5)
+            row = ttk.Frame(frame)
+            row.pack(fill="x")
 
-        self.geo_status = ttk.Label(geo_row, text="Not captured")
-        self.geo_status.pack(side="left", padx=10)
+            btn = ttk.Button(
+                row, text="CAPTURE",
+                command=lambda k=key: self._start_capture(k)
+            )
+            btn.pack(side="left", padx=5)
+            self.capture_buttons[key] = btn
 
-        # OK button capture
-        ok_frame = ttk.LabelFrame(self, text="OK Button", padding=10)
-        ok_frame.pack(fill="x", padx=10, pady=5)
+            status = ttk.Label(row, text="Not set")
+            status.pack(side="left", padx=10)
+            self.status_labels[key] = status
 
-        ok_row = ttk.Frame(ok_frame)
-        ok_row.pack(fill="x")
-
-        self.ok_capture_btn = ttk.Button(
-            ok_row, text="CAPTURE", command=lambda: self._start_capture("ok")
-        )
-        self.ok_capture_btn.pack(side="left", padx=5)
-
-        self.ok_status = ttk.Label(ok_row, text="Not captured")
-        self.ok_status.pack(side="left", padx=10)
+            ttk.Label(row, text=desc, foreground="gray").pack(side="right")
 
         # Countdown label
         self.countdown_label = ttk.Label(self, text="", font=("Arial", 14, "bold"))
@@ -213,44 +285,41 @@ class ButtonSetupDialog(tk.Toplevel):
         ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(side="left", padx=5)
 
     def _update_status(self):
-        """Update status labels based on existing captures."""
-        geo_path = self.config.get("buttons", "save_to_geo", "image")
-        ok_path = self.config.get("buttons", "ok", "image")
+        """Update status labels based on existing config."""
+        for key in self.locations:
+            coords = self.config.get("click_locations", key)
+            if coords:
+                self.status_labels[key].config(
+                    text="Set: ({}, {})".format(coords[0], coords[1]),
+                    foreground="green"
+                )
+                self.captured[key] = True
+            else:
+                self.captured[key] = False
 
-        if geo_path and os.path.exists(geo_path):
-            self.geo_status.config(text="Captured", foreground="green")
-            self.captured["save_to_geo"] = True
-
-        if ok_path and os.path.exists(ok_path):
-            self.ok_status.config(text="Captured", foreground="green")
-            self.captured["ok"] = True
-
-    def _start_capture(self, button_name):
+    def _start_capture(self, location_key):
         """Start the capture countdown."""
-        self.geo_capture_btn.config(state="disabled")
-        self.ok_capture_btn.config(state="disabled")
+        for btn in self.capture_buttons.values():
+            btn.config(state="disabled")
 
-        # Minimize window
         self.withdraw()
 
-        # Start countdown in thread
         threading.Thread(
             target=self._capture_countdown,
-            args=(button_name,),
+            args=(location_key,),
             daemon=True
         ).start()
 
-    def _capture_countdown(self, button_name):
+    def _capture_countdown(self, location_key):
         """Countdown and wait for click."""
         for i in range(5, 0, -1):
             self.after(0, lambda i=i: self.countdown_label.config(
-                text=f"Click the button in {i}..."
+                text="Click the location in {}...".format(i)
             ))
             time.sleep(1)
 
         self.after(0, lambda: self.countdown_label.config(text="Click now!"))
 
-        # Wait for mouse click
         click_pos = [None]
 
         def on_click(x, y, button, pressed):
@@ -264,46 +333,39 @@ class ButtonSetupDialog(tk.Toplevel):
 
         if click_pos[0]:
             x, y = click_pos[0]
-            # Capture region around click (100x50 pixels)
-            region = (x - 50, y - 25, x + 50, y + 25)
-
-            try:
-                screenshot = ImageGrab.grab(bbox=region)
-                image_path = os.path.join(SCREENSHOTS_DIR, f"{button_name}.png")
-                screenshot.save(image_path)
-
-                # Save to config
-                self.config.set("buttons", button_name, "image", image_path)
-                self.config.set("buttons", button_name, "fallback_coords", [x, y])
-
-                self.captured[button_name] = True
-                self.after(0, lambda: self._capture_complete(button_name, True))
-            except Exception as e:
-                self.after(0, lambda: self._capture_complete(button_name, False, str(e)))
+            self.config.set("click_locations", location_key, [x, y])
+            self.captured[location_key] = True
+            self.after(0, lambda: self._capture_complete(location_key, x, y))
         else:
-            self.after(0, lambda: self._capture_complete(button_name, False, "Timeout"))
+            self.after(0, lambda: self._capture_complete(location_key, None, None))
 
-    def _capture_complete(self, button_name, success, error=None):
+    def _capture_complete(self, location_key, x, y):
         """Handle capture completion."""
         self.deiconify()
         self.countdown_label.config(text="")
-        self.geo_capture_btn.config(state="normal")
-        self.ok_capture_btn.config(state="normal")
 
-        if success:
-            if button_name == "save_to_geo":
-                self.geo_status.config(text="Captured", foreground="green")
-            else:
-                self.ok_status.config(text="Captured", foreground="green")
+        for btn in self.capture_buttons.values():
+            btn.config(state="normal")
+
+        if x is not None:
+            self.status_labels[location_key].config(
+                text="Set: ({}, {})".format(x, y),
+                foreground="green"
+            )
         else:
-            messagebox.showerror("Capture Failed", f"Could not capture: {error}")
+            messagebox.showerror("Capture Failed", "Timeout - no click detected")
 
     def _save(self):
         """Save and close dialog."""
-        if not self.captured["save_to_geo"] or not self.captured["ok"]:
+        missing = [name for key, (name, _) in self.locations.items()
+                   if not self.captured.get(key)]
+
+        if missing:
             if not messagebox.askyesno(
                 "Incomplete Setup",
-                "Not all buttons are captured. Continue anyway?"
+                "These locations are not set:\n- {}\n\nContinue anyway?".format(
+                    "\n- ".join(missing)
+                )
             ):
                 return
 
@@ -320,6 +382,7 @@ class AutomationRunner:
         self.running = False
         self.paused = False
         self.current_index = 0
+        self.indicator = ClickIndicator()
 
     def start(self, files, dry_run=False):
         """Start processing files."""
@@ -333,8 +396,9 @@ class AutomationRunner:
         if self.current_index > 0 and self.current_index < len(files):
             if messagebox.askyesno(
                 "Resume?",
-                f"Previous session stopped at file {self.current_index + 1}.\n"
-                f"Resume from there?"
+                "Previous session stopped at file {}.\nResume from there?".format(
+                    self.current_index + 1
+                )
             ):
                 pass
             else:
@@ -349,10 +413,42 @@ class AutomationRunner:
         self.running = False
         self.app.update_status("Stopped by user")
 
+    def _click(self, x, y, description=""):
+        """Click with indicator and logging."""
+        print("[CLICK] ({}, {}) - {}".format(x, y, description))
+        if not self.dry_run:
+            self.indicator.show_at(x, y)
+            time.sleep(0.15)
+            pyautogui.click(x, y)
+        else:
+            print("  (dry run - skipped)")
+
+    def _press(self, key, description=""):
+        """Press key with logging."""
+        print("[KEY] {} - {}".format(key, description))
+        if not self.dry_run:
+            pyautogui.press(key)
+        else:
+            print("  (dry run - skipped)")
+
+    def _hotkey(self, *keys, description=""):
+        """Press hotkey with logging."""
+        print("[HOTKEY] {} - {}".format("+".join(keys), description))
+        if not self.dry_run:
+            pyautogui.hotkey(*keys)
+        else:
+            print("  (dry run - skipped)")
+
     def _run(self):
         """Main automation loop."""
         import_delay = self.config.get("import_delay") or 3.0
         save_delay = self.config.get("save_delay") or 2.0
+
+        # Get click locations
+        file_list_pos = self.config.get("click_locations", "file_list")
+        save_selected_pos = self.config.get("click_locations", "save_selected")
+        working_area_pos = self.config.get("click_locations", "working_area")
+        deselect_pos = self.config.get("click_locations", "deselect")
 
         total = len(self.files)
 
@@ -369,43 +465,58 @@ class AutomationRunner:
             # Update UI
             self.app.after(0, lambda i=i, f=file: self.app.update_file_status(i, "processing"))
             self.app.after(0, lambda f=file, i=i, t=total: self.app.update_status(
-                f"Processing {f} ({i+1}/{t})..."
+                "Processing {} ({}/{})...".format(f, i + 1, t)
             ))
             self.app.after(0, lambda i=i, t=total: self.app.update_progress(i, t))
 
             try:
-                # Select file (first file: just Enter, others: Down + Enter)
-                if i > 0:
-                    if not self.dry_run:
-                        pyautogui.press('down')
+                print("\n" + "=" * 50)
+                print("Processing file {}/{}: {}".format(i + 1, total, file))
+                print("=" * 50)
+
+                # Step 1: Open Drawing (Ctrl+O)
+                self._hotkey('ctrl', 'o', description="Open Drawing dialog")
+                time.sleep(1.0)
+
+                # Step 2: Navigate to next file in dialog
+                if file_list_pos:
+                    self._click(file_list_pos[0], file_list_pos[1], "Focus file list")
                     time.sleep(0.3)
 
-                if not self.dry_run:
-                    pyautogui.press('enter')
+                if i > 0:
+                    # Move to next file
+                    self._press('down', "Select next file")
+                    time.sleep(0.2)
 
-                # Wait for import
+                self._press('enter', "Open selected file")
                 time.sleep(import_delay)
 
-                # Find and click Save to Geo
-                if not self._click_button("save_to_geo", "Save to Geo"):
-                    self.running = False
-                    break
+                # Step 3: Save Selected
+                if save_selected_pos:
+                    self._click(save_selected_pos[0], save_selected_pos[1], "Save Selected")
+                    time.sleep(0.5)
 
-                time.sleep(1)
+                # Step 4: Highlight working area
+                if working_area_pos:
+                    self._click(working_area_pos[0], working_area_pos[1], "Highlight working area")
+                    time.sleep(0.5)
 
-                # Find and click OK
-                if not self._click_button("ok", "OK"):
-                    self.running = False
-                    break
+                # Step 5: Deselect
+                if deselect_pos:
+                    self._click(deselect_pos[0], deselect_pos[1], "Deselect")
+                    time.sleep(0.5)
 
-                # Wait for save
+                # Step 6: Press Enter to save with new name
+                self._press('enter', "Confirm save")
                 time.sleep(save_delay)
 
                 # Mark complete
                 self.app.after(0, lambda i=i: self.app.update_file_status(i, "done"))
+                print("File {} complete!".format(file))
 
             except Exception as e:
-                self.app.after(0, lambda e=e: self.app.update_status(f"Error: {e}"))
+                print("ERROR: {}".format(e))
+                self.app.after(0, lambda e=e: self.app.update_status("Error: {}".format(e)))
                 self.running = False
                 break
 
@@ -414,47 +525,10 @@ class AutomationRunner:
             self.config.set("last_processed_index", 0)
             self.app.after(0, lambda: self.app.update_status("All files processed!"))
             self.app.after(0, lambda: self.app.update_progress(total, total))
-            self.app.after(0, lambda: messagebox.showinfo("Complete", f"Processed {total} files!"))
+            self.app.after(0, lambda: messagebox.showinfo("Complete", "Processed {} files!".format(total)))
 
         self.running = False
         self.app.after(0, self.app.on_automation_stopped)
-
-    def _click_button(self, button_key, button_name):
-        """Find and click a button. Returns True on success."""
-        image_path = self.config.get("buttons", button_key, "image")
-        fallback = self.config.get("buttons", button_key, "fallback_coords")
-
-        pos, strategy = ButtonDetector.find_button(image_path, fallback)
-
-        if pos:
-            self.app.after(0, lambda s=strategy: self.app.update_status(
-                f"Found {button_name} via {s}"
-            ))
-            if not self.dry_run:
-                pyautogui.click(pos[0], pos[1])
-            return True
-        else:
-            # Button not found - ask user
-            result = [None]
-            event = threading.Event()
-
-            def ask():
-                result[0] = messagebox.askretrycancel(
-                    "Button Not Found",
-                    f"Could not find '{button_name}' button.\n\n"
-                    f"Please click the button manually, then click Retry.\n"
-                    f"Or click Cancel to stop."
-                )
-                event.set()
-
-            self.app.after(0, ask)
-            event.wait()
-
-            if result[0]:
-                # User clicked retry - assume they clicked the button
-                return True
-            else:
-                return False
 
 
 class App(tk.Tk):
@@ -464,7 +538,7 @@ class App(tk.Tk):
         super().__init__()
 
         self.title("TruTops DWG to GEO Converter")
-        self.geometry("500x550")
+        self.geometry("550x600")
         self.resizable(True, True)
 
         self.config = Config()
@@ -541,7 +615,7 @@ class App(tk.Tk):
         self.stop_btn = ttk.Button(btn_frame, text="STOP", command=self._stop, state="disabled")
         self.stop_btn.pack(side="left", padx=5)
 
-        ttk.Button(btn_frame, text="Setup Buttons", command=self._setup_buttons).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Setup Locations", command=self._setup_locations).pack(side="left", padx=5)
 
         ttk.Button(btn_frame, text="Refresh", command=self._load_files).pack(side="right", padx=5)
 
@@ -554,6 +628,22 @@ class App(tk.Tk):
             options_frame,
             text="Dry Run (simulate without clicking)",
             variable=self.dry_run_var
+        ).pack(anchor="w")
+
+        # Workflow info
+        info_frame = ttk.LabelFrame(self, text="Workflow", padding=10)
+        info_frame.pack(fill="x", padx=10, pady=5)
+
+        ttk.Label(
+            info_frame,
+            text="1. Ctrl+O (Open Drawing)\n"
+                 "2. Click file list -> Down -> Enter (select next file)\n"
+                 "3. Click Save Selected\n"
+                 "4. Click Working Area\n"
+                 "5. Click Deselect\n"
+                 "6. Enter (save with new name)",
+            font=("Consolas", 9),
+            foreground="gray"
         ).pack(anchor="w")
 
     def _browse_folder(self):
@@ -582,10 +672,10 @@ class App(tk.Tk):
         # Update listbox
         self.file_listbox.delete(0, tk.END)
         for i, f in enumerate(self.files):
-            self.file_listbox.insert(tk.END, f"  {f}")
+            self.file_listbox.insert(tk.END, "  {}".format(f))
             self.file_status[i] = "pending"
 
-        self.file_count_label.config(text=f"{len(self.files)} DWG files")
+        self.file_count_label.config(text="{} DWG files".format(len(self.files)))
         self.update_progress(0, len(self.files) or 1)
 
     def _start(self):
@@ -594,20 +684,17 @@ class App(tk.Tk):
             messagebox.showwarning("No Files", "No DWG files found in folder.")
             return
 
-        # Check if buttons are configured
-        geo_img = self.config.get("buttons", "save_to_geo", "image")
-        ok_img = self.config.get("buttons", "ok", "image")
+        # Check if locations are configured
+        required = ["file_list", "save_selected", "working_area", "deselect"]
+        missing = [loc for loc in required if not self.config.get("click_locations", loc)]
 
-        if not (geo_img and os.path.exists(geo_img)) or not (ok_img and os.path.exists(ok_img)):
-            if not messagebox.askyesno(
+        if missing:
+            if messagebox.askyesno(
                 "Setup Required",
-                "Button images are not configured.\n"
-                "Run Setup Buttons first?\n\n"
-                "(Click No to try with saved coordinates only)"
+                "Some click locations are not configured:\n- {}\n\n"
+                "Run Setup Locations first?".format("\n- ".join(missing))
             ):
-                pass
-            else:
-                self._setup_buttons()
+                self._setup_locations()
                 return
 
         # Disable controls
@@ -626,9 +713,9 @@ class App(tk.Tk):
         """Stop automation."""
         self.automation.stop()
 
-    def _setup_buttons(self):
-        """Open button setup dialog."""
-        ButtonSetupDialog(self, self.config)
+    def _setup_locations(self):
+        """Open location setup dialog."""
+        LocationSetupDialog(self, self.config)
 
     def update_status(self, text):
         """Update status label."""
@@ -638,7 +725,7 @@ class App(tk.Tk):
         """Update progress bar."""
         if total > 0:
             self.progress_var.set((current / total) * 100)
-            self.progress_label.config(text=f"{current}/{total}")
+            self.progress_label.config(text="{}/{}".format(current, total))
 
     def update_file_status(self, index, status):
         """Update file status in listbox."""
@@ -659,7 +746,7 @@ class App(tk.Tk):
             "done": " [Done]"
         }.get(status, "")
 
-        text = f"{prefix}{self.files[index]}{suffix}"
+        text = "{}{}{}".format(prefix, self.files[index], suffix)
 
         self.file_listbox.delete(index)
         self.file_listbox.insert(index, text)
