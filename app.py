@@ -496,65 +496,37 @@ class AutomationRunner:
         return True
 
     def _click(self, x, y, description=""):
-        """Click at position."""
+        """Click at position - simple screen click."""
         print("[CLICK] ({}, {}) - {}".format(x, y, description))
 
-        if self.step_by_step:
-            # Show where we will click (persistent until confirmed)
-            self.app.after(0, lambda: self.indicator.show_click(x, y, persistent=True))
-            time.sleep(0.1)  # Let indicator appear
-            if not self._wait_for_confirm("Click at ({}, {}) - {}".format(x, y, description)):
-                self.app.after(0, self.indicator._close_indicator)
-                return
-            self.app.after(0, self.indicator._close_indicator)
-            time.sleep(0.1)
-
-        # ALWAYS focus TruTops before clicking
-        self._focus_trutops()
-        time.sleep(0.2)
-
         if not self.dry_run:
-            pyautogui.click(x, y)
-            time.sleep(3.0)  # 3 sec delay after click
+            pyautogui.moveTo(x, y)
+            time.sleep(0.1)
+            pyautogui.click()
+            time.sleep(3.0)
         else:
-            print("  (dry run - not clicking)")
+            print("  (dry run)")
 
     def _press(self, key, description=""):
-        """Press key."""
+        """Press key - simple."""
         print("[KEY] {} - {}".format(key, description))
-
-        if self.step_by_step:
-            if not self._wait_for_confirm("Press '{}' - {}".format(key, description)):
-                return
-
-        # ALWAYS focus TruTops before pressing key
-        self._focus_trutops()
-        time.sleep(0.2)
 
         if not self.dry_run:
             pyautogui.press(key)
-            time.sleep(3.0)  # 3 sec delay after keypress
+            time.sleep(3.0)
         else:
-            print("  (dry run - not pressing)")
+            print("  (dry run)")
 
     def _hotkey(self, *keys, description=""):
-        """Press hotkey."""
+        """Press hotkey - simple."""
         key_str = "+".join(keys)
         print("[HOTKEY] {} - {}".format(key_str, description))
 
-        if self.step_by_step:
-            if not self._wait_for_confirm("Hotkey '{}' - {}".format(key_str, description)):
-                return
-
-        # ALWAYS focus TruTops before hotkey
-        self._focus_trutops()
-        time.sleep(0.2)
-
         if not self.dry_run:
             pyautogui.hotkey(*keys)
-            time.sleep(3.0)  # 3 sec delay after hotkey
+            time.sleep(3.0)
         else:
-            print("  (dry run - not pressing)")
+            print("  (dry run)")
 
     def _click_button_by_image(self, button_key, description):
         """Find and click a button using image detection."""
