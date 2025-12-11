@@ -222,6 +222,12 @@ This only needs to be done once (unless TrueTops UI changes).
    - Each file shows status indicators
    - Status messages show what's happening
 
+### TrueTops Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + O` | Open drawings |
+
 ### Tips for Best Results
 
 - **Don't move TrueTops** window during processing
