@@ -269,25 +269,34 @@ class LocationSetupDialog(tk.Toplevel):
 
             tk.Label(
                 frame, text=name, font=("Segoe UI", 10),
-                bg=self.colors["bg_light"], fg=self.colors["fg"], width=25, anchor="w"
+                bg=self.colors["bg_light"], fg=self.colors["fg"], width=22, anchor="w"
             ).pack(side="left")
 
             status = tk.Label(
                 frame, text="Not set", font=("Consolas", 9),
-                bg=self.colors["bg_light"], fg=self.colors["accent"], width=15
+                bg=self.colors["bg_light"], fg=self.colors["accent"], width=12
             )
-            status.pack(side="left", padx=10)
+            status.pack(side="left", padx=5)
             self.status_labels[key] = status
 
             btn = tk.Button(
                 frame, text="CAPTURE", font=("Segoe UI", 9),
                 bg=self.colors["accent"], fg=self.colors["fg"],
                 activebackground=self.colors["highlight"],
-                bd=0, padx=12, pady=4,
+                bd=0, padx=10, pady=4,
                 command=lambda k=key: self._start_capture(k)
             )
             btn.pack(side="right")
             self.capture_buttons[key] = btn
+
+            edit_btn = tk.Button(
+                frame, text="EDIT", font=("Segoe UI", 9),
+                bg=self.colors["bg"], fg=self.colors["fg"],
+                activebackground=self.colors["highlight"],
+                bd=0, padx=10, pady=4,
+                command=lambda k=key: self._edit_coords(k)
+            )
+            edit_btn.pack(side="right", padx=(0, 5))
 
         # Countdown label
         self.countdown_label = tk.Label(
@@ -390,6 +399,34 @@ class LocationSetupDialog(tk.Toplevel):
                 text="({}, {})".format(x, y),
                 fg=self.colors["success"]
             )
+
+    def _edit_coords(self, location_key):
+        """Manually edit coordinates."""
+        from tkinter import simpledialog
+
+        current = self.config.get("click_locations", location_key)
+        current_str = "{}, {}".format(current[0], current[1]) if current else ""
+
+        result = simpledialog.askstring(
+            "Edit Coordinates",
+            "Enter X, Y coordinates for {}:".format(self.locations[location_key]),
+            initialvalue=current_str,
+            parent=self
+        )
+
+        if result:
+            try:
+                parts = result.replace(" ", "").split(",")
+                x, y = int(parts[0]), int(parts[1])
+                self.config.set("click_locations", location_key, [x, y])
+                self.status_labels[location_key].config(
+                    text="({}, {})".format(x, y),
+                    fg=self.colors["success"]
+                )
+                print("[EDIT] {} set to ({}, {})".format(location_key, x, y))
+            except (ValueError, IndexError):
+                from tkinter import messagebox
+                messagebox.showerror("Invalid", "Enter coordinates as: X, Y")
 
     def _save(self):
         """Save and close."""
@@ -833,19 +870,26 @@ class App(tk.Tk):
         ttk.Button(btn_frame, text="Setup Locations", command=self._setup_locations).pack(side="left")
 
         # Info
-        info_frame = ttk.LabelFrame(self, text="Workflow (ESC to abort)", padding=8)
+        info_frame = tk.Frame(self, bg=self.colors["bg_light"], padx=12, pady=10)
         info_frame.pack(fill="x", padx=15, pady=10)
 
         tk.Label(
             info_frame,
-            text="1. Open Drawing  2. No  3. Paste filename  4. Enter\n"
-                 "5. Enter (import)  6. Save Selected  7. Select TL\n"
-                 "8. Select BR  9. Enter (warning)  10. Enter (save)",
+            text="Workflow (ESC to abort):",
+            font=("Segoe UI", 9, "bold"),
+            bg=self.colors["bg_light"],
+            fg=self.colors["fg"]
+        ).pack(anchor="w")
+
+        tk.Label(
+            info_frame,
+            text="1. Open Drawing  2. No  3. Paste  4. Enter  5. Enter\n"
+                 "6. Save Selected  7. Select TL  8. Select BR  9. Enter  10. Enter",
             font=("Consolas", 9),
             bg=self.colors["bg_light"],
             fg=self.colors["accent"],
             justify="left"
-        ).pack(anchor="w")
+        ).pack(anchor="w", pady=(5, 0))
 
     def _add_files(self):
         """Add DWG files."""
