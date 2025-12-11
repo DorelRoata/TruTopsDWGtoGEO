@@ -463,13 +463,15 @@ class AutomationRunner:
             if not self._wait_for_confirm("Click at ({}, {}) - {}".format(x, y, description)):
                 self.app.after(0, self.indicator._close_indicator)
                 return
-            # Close indicator before clicking
+            # Close indicator and refocus TruTops before clicking
             self.app.after(0, self.indicator._close_indicator)
             time.sleep(0.1)
+            self._focus_trutops()
+            time.sleep(0.3)
 
         if not self.dry_run:
             pyautogui.click(x, y)
-            time.sleep(1.0)  # 1 sec delay after click
+            time.sleep(3.0)  # 3 sec delay after click
         else:
             print("  (dry run - not clicking)")
 
@@ -480,10 +482,13 @@ class AutomationRunner:
         if self.step_by_step:
             if not self._wait_for_confirm("Press '{}' - {}".format(key, description)):
                 return
+            # Refocus TruTops after confirmation
+            self._focus_trutops()
+            time.sleep(0.3)
 
         if not self.dry_run:
             pyautogui.press(key)
-            time.sleep(1.0)  # 1 sec delay after keypress
+            time.sleep(3.0)  # 3 sec delay after keypress
         else:
             print("  (dry run - not pressing)")
 
@@ -495,10 +500,13 @@ class AutomationRunner:
         if self.step_by_step:
             if not self._wait_for_confirm("Hotkey '{}' - {}".format(key_str, description)):
                 return
+            # Refocus TruTops after confirmation
+            self._focus_trutops()
+            time.sleep(0.3)
 
         if not self.dry_run:
             pyautogui.hotkey(*keys)
-            time.sleep(1.0)  # 1 sec delay after hotkey
+            time.sleep(3.0)  # 3 sec delay after hotkey
         else:
             print("  (dry run - not pressing)")
 
