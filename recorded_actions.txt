@@ -1,0 +1,292 @@
+# Action Recording - 2025-12-11 07:19:07
+# Total duration: 196.95 seconds
+# Total actions: 94
+#============================================================
+
+1. [4.32s] CLICK at (549, 114) - Button.left
+2. [5.92s] CLICK at (3056, 696) - Button.left
+3. [6.47s] CLICK at (3056, 683) - Button.left
+4. [13.56s] CLICK at (2065, 572) - Button.left
+5. [16.62s] CLICK at (2664, 1527) - Button.left
+6. [18.65s] CLICK at (3159, 825) - Button.left
+7. [24.49s] CLICK at (688, 120) - Button.left
+8. [27.26s] CLICK at (74, 213) - Button.left
+9. [29.58s] CLICK at (3310, 1843) - Button.left
+10. [32.93s] CLICK at (2662, 1539) - Button.left
+11. [35.41s] CLICK at (2919, 651) - Button.left
+12. [36.35s] CLICK at (3114, 645) - Button.left
+13. [38.59s] CLICK at (549, 120) - Button.left
+14. [40.46s] CLICK at (3021, 681) - Button.left
+15. [45.18s] CLICK at (2052, 571) - Button.left
+16. [47.88s] KEY: Key.down
+17. [51.14s] CLICK at (2683, 1531) - Button.left
+18. [54.22s] CLICK at (3132, 818) - Button.left
+19. [55.84s] CLICK at (665, 127) - Button.left
+20. [57.44s] CLICK at (69, 208) - Button.left
+21. [61.2s] CLICK at (3351, 1874) - Button.left
+22. [62.61s] CLICK at (2660, 1545) - Button.left
+23. [64.19s] CLICK at (2919, 651) - Button.left
+24. [64.73s] CLICK at (3114, 645) - Button.left
+25. [66.77s] CLICK at (552, 128) - Button.left
+26. [68.22s] CLICK at (3031, 700) - Button.left
+27. [68.57s] CLICK at (3036, 686) - Button.left
+28. [69.9s] CLICK at (2108, 594) - Button.left
+29. [72.89s] KEY: Key.down
+30. [73.6s] KEY: Key.enter
+31. [74.67s] CLICK at (3159, 825) - Button.left
+32. [77.14s] CLICK at (682, 119) - Button.left
+33. [78.88s] CLICK at (71, 210) - Button.left
+34. [81.18s] CLICK at (3349, 1869) - Button.left
+35. [82.74s] CLICK at (2657, 1533) - Button.left
+36. [84.2s] CLICK at (2905, 651) - Button.left
+37. [84.68s] CLICK at (3114, 645) - Button.left
+38. [87.11s] CLICK at (538, 112) - Button.left
+39. [89.92s] CLICK at (3055, 685) - Button.left
+40. [91.91s] KEY: Key.tab
+41. [92.61s] KEY: Key.tab
+42. [93.85s] CLICK at (2248, 592) - Button.left
+43. [95.13s] CLICK at (2656, 1536) - Button.left
+44. [96.67s] CLICK at (3182, 811) - Button.left
+45. [97.07s] CLICK at (3180, 815) - Button.left
+46. [99.01s] CLICK at (689, 128) - Button.left
+47. [100.82s] CLICK at (72, 209) - Button.left
+48. [103.96s] CLICK at (3353, 1874) - Button.left
+49. [106.21s] CLICK at (2670, 1537) - Button.left
+50. [107.6s] CLICK at (2919, 651) - Button.left
+51. [108.39s] CLICK at (3114, 645) - Button.left
+52. [110.93s] KEY: Key.ctrl_l
+53. [111.15s] KEY: 
+54. [112.88s] KEY: Key.right
+55. [113.93s] KEY: Key.tab
+56. [117.39s] KEY: Key.tab
+57. [118.87s] KEY: Key.enter
+58. [120.19s] KEY: Key.enter
+59. [121.62s] KEY: Key.down
+60. [125.79s] CLICK at (2152, 565) - Button.left
+61. [127.62s] KEY: Key.enter
+62. [129.77s] KEY: Key.enter
+63. [132.21s] CLICK at (702, 132) - Button.left
+64. [134.96s] CLICK at (85, 214) - Button.left
+65. [137.13s] CLICK at (3329, 1870) - Button.left
+66. [139.87s] CLICK at (2641, 1543) - Button.left
+67. [141.47s] KEY: Key.enter
+68. [141.99s] KEY: Key.enter
+69. [144.49s] KEY: Key.ctrl_l
+70. [144.97s] KEY: 
+71. [150.05s] CLICK at (3000, 674) - Button.left
+72. [151.37s] CLICK at (2220, 704) - Button.left
+73. [156.27s] CLICK at (2645, 1539) - Button.left
+74. [158.88s] KEY: Key.enter
+75. [159.77s] KEY: Key.enter
+76. [162.56s] CLICK at (666, 124) - Button.left
+77. [163.88s] CLICK at (3047, 1881) - Button.left
+78. [166.45s] CLICK at (72, 208) - Button.left
+79. [168.97s] KEY: Key.enter
+80. [170.52s] KEY: Key.enter
+81. [171.07s] KEY: Key.enter
+82. [173.71s] CLICK at (545, 121) - Button.left
+83. [177.33s] CLICK at (3010, 683) - Button.left
+84. [178.72s] CLICK at (2199, 735) - Button.left
+85. [181.47s] KEY: Key.up
+86. [181.82s] KEY: Key.down
+87. [183.25s] KEY: Key.enter
+88. [184.0s] KEY: Key.enter
+89. [187.29s] CLICK at (683, 140) - Button.left
+90. [189.67s] CLICK at (3353, 1870) - Button.left
+91. [191.55s] CLICK at (75, 206) - Button.left
+92. [194.17s] KEY: Key.enter
+93. [194.81s] KEY: Key.enter
+94. [195.41s] KEY: Key.enter
+
+#============================================================
+# Suggested pyautogui code:
+#============================================================
+
+time.sleep(4.32)
+pyautogui.click(549, 114)  # Button.left
+time.sleep(1.6)
+pyautogui.click(3056, 696)  # Button.left
+time.sleep(0.55)
+pyautogui.click(3056, 683)  # Button.left
+time.sleep(7.09)
+pyautogui.click(2065, 572)  # Button.left
+time.sleep(3.06)
+pyautogui.click(2664, 1527)  # Button.left
+time.sleep(2.03)
+pyautogui.click(3159, 825)  # Button.left
+time.sleep(5.84)
+pyautogui.click(688, 120)  # Button.left
+time.sleep(2.77)
+pyautogui.click(74, 213)  # Button.left
+time.sleep(2.32)
+pyautogui.click(3310, 1843)  # Button.left
+time.sleep(3.35)
+pyautogui.click(2662, 1539)  # Button.left
+time.sleep(2.48)
+pyautogui.click(2919, 651)  # Button.left
+time.sleep(0.94)
+pyautogui.click(3114, 645)  # Button.left
+time.sleep(2.24)
+pyautogui.click(549, 120)  # Button.left
+time.sleep(1.87)
+pyautogui.click(3021, 681)  # Button.left
+time.sleep(4.72)
+pyautogui.click(2052, 571)  # Button.left
+time.sleep(2.7)
+pyautogui.press('down')
+time.sleep(3.26)
+pyautogui.click(2683, 1531)  # Button.left
+time.sleep(3.08)
+pyautogui.click(3132, 818)  # Button.left
+time.sleep(1.62)
+pyautogui.click(665, 127)  # Button.left
+time.sleep(1.6)
+pyautogui.click(69, 208)  # Button.left
+time.sleep(3.76)
+pyautogui.click(3351, 1874)  # Button.left
+time.sleep(1.41)
+pyautogui.click(2660, 1545)  # Button.left
+time.sleep(1.58)
+pyautogui.click(2919, 651)  # Button.left
+time.sleep(0.54)
+pyautogui.click(3114, 645)  # Button.left
+time.sleep(2.04)
+pyautogui.click(552, 128)  # Button.left
+time.sleep(1.45)
+pyautogui.click(3031, 700)  # Button.left
+time.sleep(0.35)
+pyautogui.click(3036, 686)  # Button.left
+time.sleep(1.33)
+pyautogui.click(2108, 594)  # Button.left
+time.sleep(2.99)
+pyautogui.press('down')
+time.sleep(0.71)
+pyautogui.press('enter')
+time.sleep(1.07)
+pyautogui.click(3159, 825)  # Button.left
+time.sleep(2.47)
+pyautogui.click(682, 119)  # Button.left
+time.sleep(1.74)
+pyautogui.click(71, 210)  # Button.left
+time.sleep(2.3)
+pyautogui.click(3349, 1869)  # Button.left
+time.sleep(1.56)
+pyautogui.click(2657, 1533)  # Button.left
+time.sleep(1.46)
+pyautogui.click(2905, 651)  # Button.left
+time.sleep(0.48)
+pyautogui.click(3114, 645)  # Button.left
+time.sleep(2.43)
+pyautogui.click(538, 112)  # Button.left
+time.sleep(2.81)
+pyautogui.click(3055, 685)  # Button.left
+time.sleep(1.99)
+pyautogui.press('tab')
+time.sleep(0.7)
+pyautogui.press('tab')
+time.sleep(1.24)
+pyautogui.click(2248, 592)  # Button.left
+time.sleep(1.28)
+pyautogui.click(2656, 1536)  # Button.left
+time.sleep(1.54)
+pyautogui.click(3182, 811)  # Button.left
+time.sleep(0.4)
+pyautogui.click(3180, 815)  # Button.left
+time.sleep(1.94)
+pyautogui.click(689, 128)  # Button.left
+time.sleep(1.81)
+pyautogui.click(72, 209)  # Button.left
+time.sleep(3.14)
+pyautogui.click(3353, 1874)  # Button.left
+time.sleep(2.25)
+pyautogui.click(2670, 1537)  # Button.left
+time.sleep(1.39)
+pyautogui.click(2919, 651)  # Button.left
+time.sleep(0.79)
+pyautogui.click(3114, 645)  # Button.left
+time.sleep(2.54)
+pyautogui.press('ctrl_l')
+time.sleep(0.22)
+pyautogui.press('')
+time.sleep(1.73)
+pyautogui.press('right')
+time.sleep(1.05)
+pyautogui.press('tab')
+time.sleep(3.46)
+pyautogui.press('tab')
+time.sleep(1.48)
+pyautogui.press('enter')
+time.sleep(1.32)
+pyautogui.press('enter')
+time.sleep(1.43)
+pyautogui.press('down')
+time.sleep(4.17)
+pyautogui.click(2152, 565)  # Button.left
+time.sleep(1.83)
+pyautogui.press('enter')
+time.sleep(2.15)
+pyautogui.press('enter')
+time.sleep(2.44)
+pyautogui.click(702, 132)  # Button.left
+time.sleep(2.75)
+pyautogui.click(85, 214)  # Button.left
+time.sleep(2.17)
+pyautogui.click(3329, 1870)  # Button.left
+time.sleep(2.74)
+pyautogui.click(2641, 1543)  # Button.left
+time.sleep(1.6)
+pyautogui.press('enter')
+time.sleep(0.52)
+pyautogui.press('enter')
+time.sleep(2.5)
+pyautogui.press('ctrl_l')
+time.sleep(0.48)
+pyautogui.press('')
+time.sleep(5.08)
+pyautogui.click(3000, 674)  # Button.left
+time.sleep(1.32)
+pyautogui.click(2220, 704)  # Button.left
+time.sleep(4.9)
+pyautogui.click(2645, 1539)  # Button.left
+time.sleep(2.61)
+pyautogui.press('enter')
+time.sleep(0.89)
+pyautogui.press('enter')
+time.sleep(2.79)
+pyautogui.click(666, 124)  # Button.left
+time.sleep(1.32)
+pyautogui.click(3047, 1881)  # Button.left
+time.sleep(2.57)
+pyautogui.click(72, 208)  # Button.left
+time.sleep(2.52)
+pyautogui.press('enter')
+time.sleep(1.55)
+pyautogui.press('enter')
+time.sleep(0.55)
+pyautogui.press('enter')
+time.sleep(2.64)
+pyautogui.click(545, 121)  # Button.left
+time.sleep(3.62)
+pyautogui.click(3010, 683)  # Button.left
+time.sleep(1.39)
+pyautogui.click(2199, 735)  # Button.left
+time.sleep(2.75)
+pyautogui.press('up')
+time.sleep(0.35)
+pyautogui.press('down')
+time.sleep(1.43)
+pyautogui.press('enter')
+time.sleep(0.75)
+pyautogui.press('enter')
+time.sleep(3.29)
+pyautogui.click(683, 140)  # Button.left
+time.sleep(2.38)
+pyautogui.click(3353, 1870)  # Button.left
+time.sleep(1.88)
+pyautogui.click(75, 206)  # Button.left
+time.sleep(2.62)
+pyautogui.press('enter')
+time.sleep(0.64)
+pyautogui.press('enter')
+time.sleep(0.6)
+pyautogui.press('enter')
