@@ -27,6 +27,7 @@ DEFAULT_CONFIG = {
     "trutops_window_title": "TruTops",  # Window title to focus
     "click_locations": {
         "file_list": None,        # Where to click to focus file list in Open dialog
+        "no_save": [2636, 1580],  # "No" button when asked to save modifications
         "working_area": None,     # Click to highlight working area
         "deselect": None,         # Click to deselect
     },
@@ -224,6 +225,7 @@ class LocationSetupDialog(tk.Toplevel):
 
         self.locations = {
             "file_list": ("File List (in Open dialog)", "Click on the file list area"),
+            "no_save": ("No Button (save dialog)", "Click 'No' when asked to save"),
             "working_area": ("Working Area", "Click to highlight working area"),
             "deselect": ("Deselect Button", "Click to deselect"),
         }
@@ -488,6 +490,7 @@ class AutomationRunner:
         save_delay = self.config.get("save_delay") or 2.0
 
         file_list_pos = self.config.get("click_locations", "file_list")
+        no_save_pos = self.config.get("click_locations", "no_save")
         working_area_pos = self.config.get("click_locations", "working_area")
         deselect_pos = self.config.get("click_locations", "deselect")
 
@@ -536,7 +539,12 @@ class AutomationRunner:
                     time.sleep(0.2)
 
                 self._press('enter', "Open file")
-                time.sleep(import_delay)
+                time.sleep(1.0)
+
+                # Step 2b: Click "No" when asked to save modifications
+                if no_save_pos:
+                    self._click(no_save_pos[0], no_save_pos[1], "No (don't save)")
+                    time.sleep(import_delay)
 
                 if not self.running:
                     break
@@ -693,8 +701,8 @@ class App(tk.Tk):
 
         ttk.Label(
             info_frame,
-            text="1. Ctrl+O  2. Select file  3. Save Selected (image)\n"
-                 "4. Working Area  5. Deselect  6. Enter",
+            text="1. Ctrl+O  2. Select file  3. Click 'No' (don't save)\n"
+                 "4. Save Selected  5. Working Area  6. Deselect  7. Enter",
             font=("Consolas", 9), foreground="gray"
         ).pack(anchor="w")
 
