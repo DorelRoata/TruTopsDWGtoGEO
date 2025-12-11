@@ -422,7 +422,11 @@ class AutomationRunner:
     def _focus_trutops(self):
         """Try to focus TrueTops window."""
         try:
-            title = self.config.get("trutops_window_title") or "TruTops"
+            title = self.config.get("trutops_window_title")
+            if not title:
+                # No window title configured - skip focusing
+                print("[FOCUS] Skipped (no window configured)")
+                return True
 
             # Try pyautogui first
             windows = pyautogui.getWindowsWithTitle(title)
