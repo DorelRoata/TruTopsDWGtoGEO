@@ -1,22 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-Step Recorder - Record and label each action
-After each click/keypress, type what the step does (or 'x' to ignore)
-Press ESC when done recording.
+Step Recorder - Record all actions, then label them after
+1. Perform your full workflow in TrueTops
+2. Press ESC when done
+3. Then label each action (or 'x' to skip)
 """
 
 import time
 from datetime import datetime
 from pynput import mouse, keyboard
-import threading
 
 LOG_FILE = "labeled_steps.txt"
 
 actions = []
 running = True
 start_time = None
-current_action = None
-waiting_for_label = False
 
 
 def get_elapsed():
@@ -25,58 +23,30 @@ def get_elapsed():
     return 0
 
 
-def prompt_for_label():
-    """Ask user to label the action."""
-    global current_action, waiting_for_label
-
-    if current_action:
-        waiting_for_label = True
-
-        if current_action["type"] == "click":
-            print("\n  >> CLICK at ({}, {})".format(
-                current_action["x"], current_action["y"]))
-        else:
-            print("\n  >> KEY: {}".format(current_action["key"]))
-
-        label = input("  Label (or 'x' to skip): ").strip()
-
-        if label.lower() != 'x' and label != '':
-            current_action["label"] = label
-            actions.append(current_action)
-            print("  Saved: {}".format(label))
-        else:
-            print("  Skipped")
-
-        current_action = None
-        waiting_for_label = False
-
-
 def on_click(x, y, button, pressed):
-    global current_action, running
+    global running
 
-    if not running or waiting_for_label:
-        return
+    if not running:
+        return False
 
     if pressed and button == mouse.Button.left:
-        current_action = {
+        action = {
             "time": get_elapsed(),
             "type": "click",
             "x": x,
-            "y": y
+            "y": y,
+            "label": ""
         }
-        # Prompt in main thread
-        threading.Thread(target=prompt_for_label, daemon=True).start()
+        actions.append(action)
+        print("  [{}s] CLICK at ({}, {})".format(action["time"], x, y))
 
 
 def on_key(key):
-    global current_action, running
+    global running
 
     if key == keyboard.Key.esc:
         running = False
         return False
-
-    if not running or waiting_for_label:
-        return
 
     try:
         key_name = key.char
@@ -84,30 +54,64 @@ def on_key(key):
         key_name = str(key).replace("Key.", "")
 
     # Skip modifier keys alone
-    if key_name in ['shift', 'ctrl', 'alt', 'shift_r', 'ctrl_r', 'alt_r']:
+    if key_name in ['shift', 'ctrl', 'alt', 'shift_r', 'ctrl_r', 'alt_r', 'ctrl_l', 'shift_l', 'alt_l']:
         return
 
-    current_action = {
+    action = {
         "time": get_elapsed(),
         "type": "key",
-        "key": key_name
+        "key": key_name,
+        "label": ""
     }
-    threading.Thread(target=prompt_for_label, daemon=True).start()
+    actions.append(action)
+    print("  [{}s] KEY: {}".format(action["time"], key_name))
 
 
-def save_results():
+def label_actions():
+    """Go through each action and ask for a label."""
+    print("\n" + "=" * 50)
+    print("LABELING PHASE")
+    print("=" * 50)
+    print("For each action, type what it does.")
+    print("Type 'x' to skip/ignore an action.")
+    print()
+
+    labeled = []
+
+    for i, action in enumerate(actions):
+        print("-" * 40)
+        print("Action {}/{}:".format(i + 1, len(actions)))
+
+        if action["type"] == "click":
+            print("  CLICK at ({}, {})".format(action["x"], action["y"]))
+        else:
+            print("  KEY: {}".format(action["key"]))
+
+        label = input("  What does this do? (x to skip): ").strip()
+
+        if label.lower() != 'x' and label != '':
+            action["label"] = label
+            labeled.append(action)
+            print("  -> Labeled: {}".format(label))
+        else:
+            print("  -> Skipped")
+
+    return labeled
+
+
+def save_results(labeled_actions):
     with open(LOG_FILE, 'w') as f:
         f.write("# Step Recording - {}\n".format(
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        f.write("# {} labeled steps\n".format(len(actions)))
+        f.write("# {} labeled steps\n".format(len(labeled_actions)))
         f.write("#" + "=" * 60 + "\n\n")
 
         f.write("WORKFLOW STEPS:\n")
         f.write("-" * 40 + "\n")
 
-        for i, action in enumerate(actions, 1):
+        for i, action in enumerate(labeled_actions, 1):
             if action["type"] == "click":
-                f.write("{}. {} \n".format(i, action["label"]))
+                f.write("{}. {}\n".format(i, action["label"]))
                 f.write("   -> CLICK ({}, {})\n\n".format(
                     action["x"], action["y"]))
             else:
@@ -115,17 +119,21 @@ def save_results():
                 f.write("   -> KEY: {}\n\n".format(action["key"]))
 
         f.write("\n" + "#" + "=" * 60 + "\n")
-        f.write("# CONFIG FORMAT (copy to config.json):\n")
+        f.write("# SUGGESTED CONFIG:\n")
         f.write("#" + "=" * 60 + "\n\n")
 
         f.write('"click_locations": {\n')
-        for action in actions:
+        for action in labeled_actions:
             if action["type"] == "click":
-                # Convert label to config key format
-                key = action["label"].lower().replace(" ", "_").replace("'", "")
-                f.write('    "{}": [{}, {}],\n'.format(
-                    key, action["x"], action["y"]))
+                key = action["label"].lower().replace(" ", "_").replace("'", "").replace("-", "_")
+                f.write('    "{}": [{}, {}],\n'.format(key, action["x"], action["y"]))
         f.write('},\n')
+
+        f.write('\n"key_actions": [\n')
+        for action in labeled_actions:
+            if action["type"] == "key":
+                f.write('    # {} -> key: {}\n'.format(action["label"], action["key"]))
+        f.write(']\n')
 
     print("\nResults saved to: {}".format(LOG_FILE))
 
@@ -137,20 +145,17 @@ def main():
     print("       STEP RECORDER")
     print("=" * 50)
     print()
-    print("Instructions:")
-    print("  1. Switch to TrueTops")
-    print("  2. Perform each action")
-    print("  3. Come back here and type what the action does")
-    print("  4. Type 'x' to skip/ignore an action")
-    print("  5. Press ESC when done")
+    print("1. Switch to TrueTops")
+    print("2. Perform your FULL workflow (all steps)")
+    print("3. Press ESC when done")
+    print("4. Then come back to label each action")
     print()
     print("Recording starts in 3 seconds...")
-    print()
-
     time.sleep(3)
 
+    print()
     print("=" * 50)
-    print("RECORDING - Press ESC to finish")
+    print("RECORDING - Do your workflow, press ESC when done")
     print("=" * 50)
 
     start_time = time.time()
@@ -167,13 +172,21 @@ def main():
     mouse_listener.stop()
 
     print("\n" + "=" * 50)
-    print("RECORDING COMPLETE")
+    print("RECORDING STOPPED - {} actions captured".format(len(actions)))
     print("=" * 50)
 
-    save_results()
+    if len(actions) == 0:
+        print("No actions recorded.")
+        return
 
-    print("\n{} steps recorded.".format(len(actions)))
-    print("Review: {}".format(LOG_FILE))
+    # Now label each action
+    labeled = label_actions()
+
+    if labeled:
+        save_results(labeled)
+        print("\n{} steps labeled and saved.".format(len(labeled)))
+    else:
+        print("\nNo steps labeled.")
 
 
 if __name__ == "__main__":
