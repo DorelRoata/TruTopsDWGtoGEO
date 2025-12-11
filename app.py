@@ -222,19 +222,24 @@ class LocationSetupDialog(tk.Toplevel):
 
     def __init__(self, parent, config):
         super().__init__(parent)
+        self.parent = parent
         self.config = config
         self.title("Setup Click Locations")
-        self.geometry("550x620")
-        self.minsize(550, 620)
+        self.geometry("500x580")
+        self.minsize(500, 580)
         self.transient(parent)
         self.grab_set()
 
+        # Use parent's colors
+        self.colors = parent.colors
+        self.configure(bg=self.colors["bg"])
+
         self.locations = {
-            "open_drawing": ("Open Drawing", "Click the 'Open Drawing' button/menu"),
-            "no_save": ("No Button", "Click 'No' when asked to save modifications"),
-            "save_selected": ("Save Selected", "Click 'Save Selected to GEO' button"),
-            "select_top_left": ("Selection Top-Left", "Click TOP-LEFT corner of part"),
-            "select_bottom_right": ("Selection Bottom-Right", "Click BOTTOM-RIGHT corner"),
+            "open_drawing": "Open Drawing button",
+            "no_save": "No button (save dialog)",
+            "save_selected": "Save Selected to GEO",
+            "select_top_left": "Selection TOP-LEFT",
+            "select_bottom_right": "Selection BOTTOM-RIGHT",
         }
 
         self.captured = {}
@@ -244,48 +249,72 @@ class LocationSetupDialog(tk.Toplevel):
     def _create_widgets(self):
         """Create dialog widgets."""
         # Instructions
-        instr_frame = ttk.LabelFrame(self, text="Instructions", padding=10)
-        instr_frame.pack(fill="x", padx=10, pady=10)
-
-        ttk.Label(
-            instr_frame,
-            text="Click CAPTURE, then click the location in TrueTops within 5 seconds.\n"
-                 "Make sure TrueTops is visible before capturing.",
+        instr = tk.Label(
+            self,
+            text="Click CAPTURE, then click the button in TruTops within 5 seconds.",
+            font=("Segoe UI", 10),
+            bg=self.colors["bg"],
+            fg=self.colors["fg"],
             wraplength=450
-        ).pack()
+        )
+        instr.pack(pady=15)
 
         # Location captures
         self.status_labels = {}
         self.capture_buttons = {}
 
-        for key, (name, desc) in self.locations.items():
-            frame = ttk.LabelFrame(self, text=name, padding=10)
-            frame.pack(fill="x", padx=10, pady=5)
+        for key, name in self.locations.items():
+            frame = tk.Frame(self, bg=self.colors["bg_light"], padx=10, pady=8)
+            frame.pack(fill="x", padx=15, pady=4)
 
-            row = ttk.Frame(frame)
-            row.pack(fill="x")
+            tk.Label(
+                frame, text=name, font=("Segoe UI", 10),
+                bg=self.colors["bg_light"], fg=self.colors["fg"], width=25, anchor="w"
+            ).pack(side="left")
 
-            btn = ttk.Button(
-                row, text="CAPTURE",
-                command=lambda k=key: self._start_capture(k)
+            status = tk.Label(
+                frame, text="Not set", font=("Consolas", 9),
+                bg=self.colors["bg_light"], fg=self.colors["accent"], width=15
             )
-            btn.pack(side="left", padx=5)
-            self.capture_buttons[key] = btn
-
-            status = ttk.Label(row, text="Not set")
             status.pack(side="left", padx=10)
             self.status_labels[key] = status
 
+            btn = tk.Button(
+                frame, text="CAPTURE", font=("Segoe UI", 9),
+                bg=self.colors["accent"], fg=self.colors["fg"],
+                activebackground=self.colors["highlight"],
+                bd=0, padx=12, pady=4,
+                command=lambda k=key: self._start_capture(k)
+            )
+            btn.pack(side="right")
+            self.capture_buttons[key] = btn
+
         # Countdown label
-        self.countdown_label = ttk.Label(self, text="", font=("Arial", 14, "bold"))
-        self.countdown_label.pack(pady=10)
+        self.countdown_label = tk.Label(
+            self, text="", font=("Segoe UI", 14, "bold"),
+            bg=self.colors["bg"], fg=self.colors["highlight"]
+        )
+        self.countdown_label.pack(pady=15)
 
         # Buttons
-        btn_frame = ttk.Frame(self)
-        btn_frame.pack(fill="x", padx=10, pady=10)
+        btn_frame = tk.Frame(self, bg=self.colors["bg"])
+        btn_frame.pack(fill="x", padx=15, pady=15)
 
-        ttk.Button(btn_frame, text="Save", command=self._save).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(side="left", padx=5)
+        tk.Button(
+            btn_frame, text="Save & Close", font=("Segoe UI", 10),
+            bg=self.colors["success"], fg="#ffffff",
+            activebackground=self.colors["highlight"],
+            bd=0, padx=20, pady=8,
+            command=self._save
+        ).pack(side="left", padx=5)
+
+        tk.Button(
+            btn_frame, text="Cancel", font=("Segoe UI", 10),
+            bg=self.colors["accent"], fg=self.colors["fg"],
+            activebackground=self.colors["highlight"],
+            bd=0, padx=20, pady=8,
+            command=self.destroy
+        ).pack(side="left", padx=5)
 
     def _update_status(self):
         """Update status labels."""
@@ -293,11 +322,15 @@ class LocationSetupDialog(tk.Toplevel):
             coords = self.config.get("click_locations", key)
             if coords:
                 self.status_labels[key].config(
-                    text="Set: ({}, {})".format(coords[0], coords[1]),
-                    foreground="green"
+                    text="({}, {})".format(coords[0], coords[1]),
+                    fg=self.colors["success"]
                 )
                 self.captured[key] = True
             else:
+                self.status_labels[key].config(
+                    text="Not set",
+                    fg=self.colors["accent"]
+                )
                 self.captured[key] = False
 
     def _start_capture(self, location_key):
@@ -354,8 +387,8 @@ class LocationSetupDialog(tk.Toplevel):
 
         if x is not None:
             self.status_labels[location_key].config(
-                text="Set: ({}, {})".format(x, y),
-                foreground="green"
+                text="({}, {})".format(x, y),
+                fg=self.colors["success"]
             )
 
     def _save(self):
@@ -799,22 +832,6 @@ class App(tk.Tk):
 
         ttk.Button(btn_frame, text="Setup Locations", command=self._setup_locations).pack(side="left")
 
-        # Options
-        options_frame = ttk.Frame(self)
-        options_frame.pack(fill="x", padx=15, pady=5)
-
-        self.dry_run_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(
-            options_frame, text="Dry Run (no clicks)",
-            variable=self.dry_run_var
-        ).pack(anchor="w", pady=2)
-
-        self.step_by_step_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(
-            options_frame, text="Step-by-step (confirm each action)",
-            variable=self.step_by_step_var
-        ).pack(anchor="w", pady=2)
-
         # Info
         info_frame = ttk.LabelFrame(self, text="Workflow (ESC to abort)", padding=8)
         info_frame.pack(fill="x", padx=15, pady=10)
@@ -884,11 +901,7 @@ class App(tk.Tk):
         for i in range(len(self.files)):
             self.update_file_status(i, "pending")
 
-        self.automation.start(
-            self.files,
-            dry_run=self.dry_run_var.get(),
-            step_by_step=self.step_by_step_var.get()
-        )
+        self.automation.start(self.files)
 
     def _stop(self):
         """Stop automation."""
