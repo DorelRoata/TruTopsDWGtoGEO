@@ -781,6 +781,7 @@ class App(tk.Tk):
         self.stop_btn.pack(side="left", padx=5)
 
         ttk.Button(btn_frame, text="Setup Locations", command=self._setup_locations).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="List Windows", command=self._list_windows).pack(side="left", padx=5)
 
         # Options
         options_frame = ttk.Frame(self)
@@ -877,6 +878,31 @@ class App(tk.Tk):
     def _setup_locations(self):
         """Open setup dialog."""
         LocationSetupDialog(self, self.config)
+
+    def _list_windows(self):
+        """List all visible windows for debugging."""
+        try:
+            import win32gui
+
+            windows = []
+            def callback(hwnd, windows_list):
+                if win32gui.IsWindowVisible(hwnd):
+                    title = win32gui.GetWindowText(hwnd)
+                    if title:
+                        windows_list.append(title)
+
+            win32gui.EnumWindows(callback, windows)
+
+            print("\n" + "=" * 50)
+            print("ALL VISIBLE WINDOWS:")
+            print("=" * 50)
+            for w in sorted(windows):
+                print("  - {}".format(w))
+            print("=" * 50 + "\n")
+
+            messagebox.showinfo("Windows Listed", "Check the console for all window titles")
+        except ImportError:
+            messagebox.showerror("Error", "Install pywin32: pip install pywin32")
 
     def update_status(self, text):
         """Update status label."""
