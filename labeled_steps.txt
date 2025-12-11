@@ -1,0 +1,60 @@
+# Step Recording - 2025-12-11 08:28:15
+# 11 labeled steps
+#============================================================
+
+WORKFLOW STEPS:
+----------------------------------------
+1. Open Drawing Shortcut
+   -> KEY: 
+
+2. Save modifications, click no
+   -> CLICK (3009, 672)
+
+3. select file dir to move down to next file name
+   -> CLICK (2690, 667)
+
+4. move down to next file name on the list
+   -> KEY: down
+
+5. open drawing
+   -> KEY: enter
+
+6. confirm import settings
+   -> KEY: enter
+
+7. save selected to geo
+   -> CLICK (680, 126)
+
+8. first corner of the selection bounding box
+   -> CLICK (75, 209)
+
+9. second corner of the selection bounding box to select the part
+   -> CLICK (3350, 1867)
+
+10. warning window that there is multiple geometry, sometimes this will not pop up with single geomatry but we cna still record this step
+   -> KEY: enter
+
+11. save file
+   -> KEY: enter
+
+
+#============================================================
+# SUGGESTED CONFIG:
+#============================================================
+
+"click_locations": {
+    "save_modifications,_click_no": [3009, 672],
+    "select_file_dir_to_move_down_to_next_file_name": [2690, 667],
+    "save_selected_to_geo": [680, 126],
+    "first_corner_of_the_selection_bounding_box": [75, 209],
+    "second_corner_of_the_selection_bounding_box_to_select_the_part": [3350, 1867],
+},
+
+"key_actions": [
+    # Open Drawing Shortcut -> key: 
+    # move down to next file name on the list -> key: down
+    # open drawing -> key: enter
+    # confirm import settings -> key: enter
+    # warning window that there is multiple geometry, sometimes this will not pop up with single geomatry but we cna still record this step -> key: enter
+    # save file -> key: enter
+]
