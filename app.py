@@ -225,8 +225,8 @@ class LocationSetupDialog(tk.Toplevel):
         self.parent = parent
         self.config = config
         self.title("Setup Click Locations")
-        self.geometry("500x580")
-        self.minsize(500, 580)
+        self.geometry("580x580")
+        self.minsize(580, 580)
         self.transient(parent)
         self.grab_set()
 
@@ -269,16 +269,10 @@ class LocationSetupDialog(tk.Toplevel):
 
             tk.Label(
                 frame, text=name, font=("Segoe UI", 10),
-                bg=self.colors["bg_light"], fg=self.colors["fg"], width=22, anchor="w"
+                bg=self.colors["bg_light"], fg=self.colors["fg"], anchor="w"
             ).pack(side="left")
 
-            status = tk.Label(
-                frame, text="Not set", font=("Consolas", 9),
-                bg=self.colors["bg_light"], fg=self.colors["accent"], width=12
-            )
-            status.pack(side="left", padx=5)
-            self.status_labels[key] = status
-
+            # Buttons on right side
             btn = tk.Button(
                 frame, text="CAPTURE", font=("Segoe UI", 9),
                 bg=self.colors["accent"], fg=self.colors["fg"],
@@ -286,7 +280,7 @@ class LocationSetupDialog(tk.Toplevel):
                 bd=0, padx=10, pady=4,
                 command=lambda k=key: self._start_capture(k)
             )
-            btn.pack(side="right")
+            btn.pack(side="right", padx=(5, 0))
             self.capture_buttons[key] = btn
 
             edit_btn = tk.Button(
@@ -296,7 +290,14 @@ class LocationSetupDialog(tk.Toplevel):
                 bd=0, padx=10, pady=4,
                 command=lambda k=key: self._edit_coords(k)
             )
-            edit_btn.pack(side="right", padx=(0, 5))
+            edit_btn.pack(side="right", padx=(5, 0))
+
+            status = tk.Label(
+                frame, text="Not set", font=("Consolas", 9),
+                bg=self.colors["bg_light"], fg=self.colors["accent"]
+            )
+            status.pack(side="right", padx=(10, 0))
+            self.status_labels[key] = status
 
         # Countdown label
         self.countdown_label = tk.Label(
@@ -757,8 +758,8 @@ class App(tk.Tk):
         super().__init__()
 
         self.title("TruTops DWG to GEO Converter")
-        self.geometry("600x700")
-        self.minsize(600, 700)
+        self.geometry("620x680")
+        self.minsize(620, 680)
 
         # Slate satin theme colors
         self.colors = {
@@ -875,21 +876,11 @@ class App(tk.Tk):
 
         tk.Label(
             info_frame,
-            text="Workflow (ESC to abort):",
-            font=("Segoe UI", 9, "bold"),
+            text="Workflow (ESC to abort):  Open > No > Paste > Enter > Enter > Save > TL > BR > Enter > Enter",
+            font=("Consolas", 8),
             bg=self.colors["bg_light"],
-            fg=self.colors["fg"]
+            fg=self.colors["accent"]
         ).pack(anchor="w")
-
-        tk.Label(
-            info_frame,
-            text="1. Open Drawing  2. No  3. Paste  4. Enter  5. Enter\n"
-                 "6. Save Selected  7. Select TL  8. Select BR  9. Enter  10. Enter",
-            font=("Consolas", 9),
-            bg=self.colors["bg_light"],
-            fg=self.colors["accent"],
-            justify="left"
-        ).pack(anchor="w", pady=(5, 0))
 
     def _add_files(self):
         """Add DWG files."""
