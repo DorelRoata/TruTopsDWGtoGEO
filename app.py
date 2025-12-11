@@ -219,8 +219,8 @@ class LocationSetupDialog(tk.Toplevel):
         super().__init__(parent)
         self.config = config
         self.title("Setup Click Locations")
-        self.geometry("500x400")
-        self.resizable(True, True)
+        self.geometry("550x550")
+        self.minsize(550, 550)
         self.transient(parent)
         self.grab_set()
 
@@ -614,8 +614,8 @@ class App(tk.Tk):
         super().__init__()
 
         self.title("TruTops DWG to GEO Converter")
-        self.geometry("500x500")
-        self.minsize(400, 400)
+        self.geometry("550x650")
+        self.minsize(550, 650)
 
         self.config = Config()
         self.automation = AutomationRunner(self)
