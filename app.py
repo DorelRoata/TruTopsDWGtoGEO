@@ -26,10 +26,11 @@ DEFAULT_CONFIG = {
     "save_delay": 2.0,
     "trutops_window_title": "TruTops",  # Window title to focus
     "click_locations": {
-        "file_list": None,        # Where to click to focus file list in Open dialog
-        "no_save": [2636, 1580],  # "No" button when asked to save modifications
-        "working_area": None,     # Click to highlight working area
-        "deselect": None,         # Click to deselect
+        "file_list": None,           # Where to click to focus file list in Open dialog
+        "no_save": [692, 711],       # "No" button when asked to save modifications
+        "select_top_left": None,     # Top-left corner of selection box
+        "select_bottom_right": None, # Bottom-right corner of selection box
+        "deselect": None,            # Click to deselect
     },
     "buttons": {
         "save_selected": {
@@ -226,7 +227,8 @@ class LocationSetupDialog(tk.Toplevel):
         self.locations = {
             "file_list": ("File List (in Open dialog)", "Click on the file list area"),
             "no_save": ("No Button (save dialog)", "Click 'No' when asked to save"),
-            "working_area": ("Working Area", "Click to highlight working area"),
+            "select_top_left": ("Selection Top-Left", "Click TOP-LEFT corner of part"),
+            "select_bottom_right": ("Selection Bottom-Right", "Click BOTTOM-RIGHT corner"),
             "deselect": ("Deselect Button", "Click to deselect"),
         }
 
@@ -491,7 +493,8 @@ class AutomationRunner:
 
         file_list_pos = self.config.get("click_locations", "file_list")
         no_save_pos = self.config.get("click_locations", "no_save")
-        working_area_pos = self.config.get("click_locations", "working_area")
+        select_tl_pos = self.config.get("click_locations", "select_top_left")
+        select_br_pos = self.config.get("click_locations", "select_bottom_right")
         deselect_pos = self.config.get("click_locations", "deselect")
 
         total = len(self.files)
@@ -560,9 +563,13 @@ class AutomationRunner:
                 if not self.running:
                     break
 
-                # Step 4: Working area
-                if working_area_pos:
-                    self._click(working_area_pos[0], working_area_pos[1], "Working area")
+                # Step 4: Select part (click top-left, then bottom-right)
+                if select_tl_pos:
+                    self._click(select_tl_pos[0], select_tl_pos[1], "Selection top-left")
+                    time.sleep(0.3)
+
+                if select_br_pos:
+                    self._click(select_br_pos[0], select_br_pos[1], "Selection bottom-right")
                     time.sleep(0.5)
 
                 # Step 5: Deselect
@@ -701,8 +708,8 @@ class App(tk.Tk):
 
         ttk.Label(
             info_frame,
-            text="1. Ctrl+O  2. Select file  3. Click 'No' (don't save)\n"
-                 "4. Save Selected  5. Working Area  6. Deselect  7. Enter",
+            text="1. Ctrl+O  2. Select file  3. 'No' (don't save)\n"
+                 "4. Save Selected  5. Select TL+BR  6. Deselect  7. Enter",
             font=("Consolas", 9), foreground="gray"
         ).pack(anchor="w")
 
@@ -743,7 +750,7 @@ class App(tk.Tk):
             return
 
         # Check locations
-        required = ["file_list", "working_area", "deselect"]
+        required = ["file_list", "select_top_left", "select_bottom_right", "deselect"]
         missing = [loc for loc in required if not self.config.get("click_locations", loc)]
 
         if missing:
