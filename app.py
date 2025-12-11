@@ -134,8 +134,13 @@ class ClickIndicator:
         self.app = app
         self.indicator_window = None
 
-    def show_click(self, x, y):
-        """Show a yellow circle at click position briefly."""
+    def show_click(self, x, y, persistent=False):
+        """Show a yellow circle at click position.
+
+        Args:
+            x, y: Click coordinates
+            persistent: If True, don't auto-close (for step-by-step mode)
+        """
         try:
             # Create indicator window
             self.indicator_window = tk.Toplevel(self.app)
@@ -163,8 +168,9 @@ class ClickIndicator:
             canvas.pack()
             canvas.create_oval(5, 5, size-5, size-5, outline='yellow', width=4)
 
-            # Auto-close after 200ms
-            self.indicator_window.after(200, self._close_indicator)
+            # Auto-close after 200ms unless persistent
+            if not persistent:
+                self.indicator_window.after(200, self._close_indicator)
 
         except Exception as e:
             print("Indicator error: {}".format(e))
@@ -360,13 +366,16 @@ class AutomationRunner:
         self.indicator = ClickIndicator(app)
         self.escape_pressed = False
         self.keyboard_listener = None
+        self.step_by_step = False
+        self.dry_run = False
 
-    def start(self, files, dry_run=False):
+    def start(self, files, dry_run=False, step_by_step=False):
         """Start processing files."""
         self.running = True
         self.escape_pressed = False
         self.files = files
         self.dry_run = dry_run
+        self.step_by_step = step_by_step
         self.current_index = self.config.get("last_processed_index") or 0
 
         # Ask if resuming
@@ -430,37 +439,66 @@ class AutomationRunner:
             print("[FOCUS] Could not focus window: {}".format(e))
             return False
 
+    def _wait_for_confirm(self, action_desc):
+        """In step-by-step mode, wait for user to press Enter."""
+        if self.step_by_step:
+            print("\n  >>> NEXT: {} <<<".format(action_desc))
+            print("  Press ENTER to continue (or 'q' to quit)...")
+            response = input("  > ").strip().lower()
+            if response == 'q':
+                self.running = False
+                return False
+        return True
+
     def _click(self, x, y, description=""):
-        """Click with indicator."""
+        """Click at position."""
         print("[CLICK] ({}, {}) - {}".format(x, y, description))
-        if not self.dry_run:
-            # Show indicator on main thread
-            self.app.after(0, lambda: self.indicator.show_click(x, y))
+
+        if self.step_by_step:
+            # Show where we will click (persistent until confirmed)
+            self.app.after(0, lambda: self.indicator.show_click(x, y, persistent=True))
+            time.sleep(0.1)  # Let indicator appear
+            if not self._wait_for_confirm("Click at ({}, {}) - {}".format(x, y, description)):
+                self.app.after(0, self.indicator._close_indicator)
+                return
+            # Close indicator before clicking
+            self.app.after(0, self.indicator._close_indicator)
             time.sleep(0.1)
+
+        if not self.dry_run:
             pyautogui.click(x, y)
+            time.sleep(1.0)  # 1 sec delay after click
         else:
-            print("  (dry run)")
+            print("  (dry run - not clicking)")
 
     def _press(self, key, description=""):
-        """Press key with indicator."""
+        """Press key."""
         print("[KEY] {} - {}".format(key, description))
+
+        if self.step_by_step:
+            if not self._wait_for_confirm("Press '{}' - {}".format(key, description)):
+                return
+
         if not self.dry_run:
-            self.app.after(0, lambda: self.indicator.show_keypress(key))
-            time.sleep(0.1)
             pyautogui.press(key)
+            time.sleep(1.0)  # 1 sec delay after keypress
         else:
-            print("  (dry run)")
+            print("  (dry run - not pressing)")
 
     def _hotkey(self, *keys, description=""):
         """Press hotkey."""
-        print("[HOTKEY] {} - {}".format("+".join(keys), description))
+        key_str = "+".join(keys)
+        print("[HOTKEY] {} - {}".format(key_str, description))
+
+        if self.step_by_step:
+            if not self._wait_for_confirm("Hotkey '{}' - {}".format(key_str, description)):
+                return
+
         if not self.dry_run:
-            key_str = "+".join(keys)
-            self.app.after(0, lambda: self.indicator.show_keypress(key_str))
-            time.sleep(0.1)
             pyautogui.hotkey(*keys)
+            time.sleep(1.0)  # 1 sec delay after hotkey
         else:
-            print("  (dry run)")
+            print("  (dry run - not pressing)")
 
     def _click_button_by_image(self, button_key, description):
         """Find and click a button using image detection."""
@@ -700,6 +738,12 @@ class App(tk.Tk):
             variable=self.dry_run_var
         ).pack(anchor="w")
 
+        self.step_by_step_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            options_frame, text="Step-by-step (confirm each action in console)",
+            variable=self.step_by_step_var
+        ).pack(anchor="w")
+
         # Info
         info_frame = ttk.LabelFrame(self, text="Workflow (Press ESC to abort)", padding=5)
         info_frame.pack(fill="x", padx=10, pady=5)
@@ -766,7 +810,11 @@ class App(tk.Tk):
         for i in range(len(self.files)):
             self.update_file_status(i, "pending")
 
-        self.automation.start(self.files, dry_run=self.dry_run_var.get())
+        self.automation.start(
+            self.files,
+            dry_run=self.dry_run_var.get(),
+            step_by_step=self.step_by_step_var.get()
+        )
 
     def _stop(self):
         """Stop automation."""
