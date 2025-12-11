@@ -680,8 +680,8 @@ class App(tk.Tk):
         super().__init__()
 
         self.title("TruTops DWG to GEO Converter")
-        self.geometry("550x650")
-        self.minsize(550, 650)
+        self.geometry("700x650")
+        self.minsize(700, 650)
 
         self.config = Config()
         self.automation = AutomationRunner(self)
