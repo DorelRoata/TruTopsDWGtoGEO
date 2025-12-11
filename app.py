@@ -26,6 +26,7 @@ DEFAULT_CONFIG = {
     "save_delay": 2.0,
     "trutops_window_title": "TruTops",  # Window title to focus
     "click_locations": {
+        "open_drawing": [549, 114],          # Open Drawing button (not Ctrl+O)
         "no_save": [3009, 672],              # "No" button - don't save modifications
         "save_selected": [680, 126],         # Save Selected to GEO button
         "select_top_left": [75, 209],        # Top-left corner of selection box
@@ -218,12 +219,13 @@ class LocationSetupDialog(tk.Toplevel):
         super().__init__(parent)
         self.config = config
         self.title("Setup Click Locations")
-        self.geometry("550x550")
-        self.minsize(550, 550)
+        self.geometry("550x620")
+        self.minsize(550, 620)
         self.transient(parent)
         self.grab_set()
 
         self.locations = {
+            "open_drawing": ("Open Drawing", "Click the 'Open Drawing' button/menu"),
             "no_save": ("No Button", "Click 'No' when asked to save modifications"),
             "save_selected": ("Save Selected", "Click 'Save Selected to GEO' button"),
             "select_top_left": ("Selection Top-Left", "Click TOP-LEFT corner of part"),
@@ -529,6 +531,7 @@ class AutomationRunner:
         save_delay = self.config.get("save_delay") or 2.0
 
         # Get all click locations
+        open_drawing_pos = self.config.get("click_locations", "open_drawing")
         no_save_pos = self.config.get("click_locations", "no_save")
         save_selected_pos = self.config.get("click_locations", "save_selected")
         select_tl_pos = self.config.get("click_locations", "select_top_left")
@@ -563,9 +566,10 @@ class AutomationRunner:
             try:
                 print("\n--- File {}/{}: {} ---".format(i + 1, total, file_name))
 
-                # Step 1: Open Drawing (Ctrl+O)
-                self._hotkey('ctrl', 'o', description="Open Drawing shortcut")
-                time.sleep(1.0)
+                # Step 1: Click Open Drawing button
+                if open_drawing_pos:
+                    self._click(open_drawing_pos[0], open_drawing_pos[1], "Open Drawing")
+                    time.sleep(0.5)
 
                 if not self.running:
                     break
@@ -750,9 +754,9 @@ class App(tk.Tk):
 
         ttk.Label(
             info_frame,
-            text="1. Ctrl+O  2. No  3. Paste filename  4. Enter (open)\n"
-                 "5. Enter (import)  6. Save Selected  7. TL  8. BR\n"
-                 "9. Enter (warning)  10. Enter (save)",
+            text="1. Open Drawing (click)  2. No  3. Paste filename\n"
+                 "4. Enter (open)  5. Enter (import)  6. Save Selected\n"
+                 "7. TL corner  8. BR corner  9. Enter  10. Enter (save)",
             font=("Consolas", 9), foreground="gray"
         ).pack(anchor="w")
 
@@ -793,7 +797,7 @@ class App(tk.Tk):
             return
 
         # Check locations
-        required = ["no_save", "save_selected", "select_top_left", "select_bottom_right"]
+        required = ["open_drawing", "no_save", "save_selected", "select_top_left", "select_bottom_right"]
         missing = [loc for loc in required if not self.config.get("click_locations", loc)]
 
         if missing:
