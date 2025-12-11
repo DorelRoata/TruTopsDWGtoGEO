@@ -758,6 +758,7 @@ class App(tk.Tk):
 
         ttk.Button(btn_frame, text="Setup Locations", command=self._setup_locations).pack(side="left", padx=5)
         ttk.Button(btn_frame, text="List Windows", command=self._list_windows).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="TEST CLICK", command=self._test_click).pack(side="left", padx=5)
 
         # Options
         options_frame = ttk.Frame(self)
@@ -854,6 +855,19 @@ class App(tk.Tk):
     def _setup_locations(self):
         """Open setup dialog."""
         LocationSetupDialog(self, self.config)
+
+    def _test_click(self):
+        """Test click at open_drawing coordinates."""
+        coords = self.config.get("click_locations", "open_drawing")
+        if coords:
+            x, y = coords[0], coords[1]
+            print("TEST: Moving to ({}, {}) and clicking...".format(x, y))
+            pyautogui.moveTo(x, y)
+            time.sleep(0.5)
+            pyautogui.click()
+            print("TEST: Done")
+        else:
+            print("No open_drawing coordinates set")
 
     def _list_windows(self):
         """List all visible windows for debugging."""
