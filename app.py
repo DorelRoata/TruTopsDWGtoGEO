@@ -26,11 +26,14 @@ DEFAULT_CONFIG = {
     "save_delay": 2.0,
     "click_locations": {
         "file_list": None,        # Where to click to focus file list in Open dialog
-        "save_selected": None,    # Save Selected button
         "working_area": None,     # Click to highlight working area
         "deselect": None,         # Click to deselect
     },
     "buttons": {
+        "save_selected": {
+            "image": "ScreenShots/Save Selection.png",
+            "fallback_coords": None
+        },
         "save_to_geo": {
             "image": "screenshots/save_to_geo.png",
             "fallback_coords": None
@@ -227,7 +230,6 @@ class LocationSetupDialog(tk.Toplevel):
 
         self.locations = {
             "file_list": ("File List (in Open dialog)", "Click on the file list area"),
-            "save_selected": ("Save Selected Button", "Click the Save Selected button"),
             "working_area": ("Working Area", "Click to highlight working area"),
             "deselect": ("Deselect Button", "Click to deselect"),
         }
@@ -439,6 +441,22 @@ class AutomationRunner:
         else:
             print("  (dry run - skipped)")
 
+    def _click_button_by_image(self, button_key, description):
+        """Find and click a button using image detection. Returns True on success."""
+        image_path = self.config.get("buttons", button_key, "image")
+        fallback = self.config.get("buttons", button_key, "fallback_coords")
+
+        pos, strategy = ButtonDetector.find_button(image_path, fallback)
+
+        if pos:
+            print("[IMAGE DETECT] Found '{}' via {} at ({}, {})".format(
+                description, strategy, pos[0], pos[1]))
+            self._click(pos[0], pos[1], description)
+            return True
+        else:
+            print("[IMAGE DETECT] Could not find '{}'".format(description))
+            return False
+
     def _run(self):
         """Main automation loop."""
         import_delay = self.config.get("import_delay") or 3.0
@@ -446,7 +464,6 @@ class AutomationRunner:
 
         # Get click locations
         file_list_pos = self.config.get("click_locations", "file_list")
-        save_selected_pos = self.config.get("click_locations", "save_selected")
         working_area_pos = self.config.get("click_locations", "working_area")
         deselect_pos = self.config.get("click_locations", "deselect")
 
@@ -491,10 +508,12 @@ class AutomationRunner:
                 self._press('enter', "Open selected file")
                 time.sleep(import_delay)
 
-                # Step 3: Save Selected
-                if save_selected_pos:
-                    self._click(save_selected_pos[0], save_selected_pos[1], "Save Selected")
-                    time.sleep(0.5)
+                # Step 3: Save Selected (using image detection)
+                if not self._click_button_by_image("save_selected", "Save Selected"):
+                    self.app.after(0, lambda: self.app.update_status("Could not find Save Selected button"))
+                    self.running = False
+                    break
+                time.sleep(0.5)
 
                 # Step 4: Highlight working area
                 if working_area_pos:
@@ -638,7 +657,7 @@ class App(tk.Tk):
             info_frame,
             text="1. Ctrl+O (Open Drawing)\n"
                  "2. Click file list -> Down -> Enter (select next file)\n"
-                 "3. Click Save Selected\n"
+                 "3. Save Selected (image detection)\n"
                  "4. Click Working Area\n"
                  "5. Click Deselect\n"
                  "6. Enter (save with new name)",
@@ -685,7 +704,7 @@ class App(tk.Tk):
             return
 
         # Check if locations are configured
-        required = ["file_list", "save_selected", "working_area", "deselect"]
+        required = ["file_list", "working_area", "deselect"]
         missing = [loc for loc in required if not self.config.get("click_locations", loc)]
 
         if missing:
