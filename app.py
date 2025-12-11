@@ -502,11 +502,12 @@ class AutomationRunner:
             if not self._wait_for_confirm("Click at ({}, {}) - {}".format(x, y, description)):
                 self.app.after(0, self.indicator._close_indicator)
                 return
-            # Close indicator and refocus TruTops before clicking
             self.app.after(0, self.indicator._close_indicator)
             time.sleep(0.1)
-            self._focus_trutops()
-            time.sleep(0.3)
+
+        # ALWAYS focus TruTops before clicking
+        self._focus_trutops()
+        time.sleep(0.2)
 
         if not self.dry_run:
             pyautogui.click(x, y)
@@ -521,9 +522,10 @@ class AutomationRunner:
         if self.step_by_step:
             if not self._wait_for_confirm("Press '{}' - {}".format(key, description)):
                 return
-            # Refocus TruTops after confirmation
-            self._focus_trutops()
-            time.sleep(0.3)
+
+        # ALWAYS focus TruTops before pressing key
+        self._focus_trutops()
+        time.sleep(0.2)
 
         if not self.dry_run:
             pyautogui.press(key)
@@ -539,9 +541,10 @@ class AutomationRunner:
         if self.step_by_step:
             if not self._wait_for_confirm("Hotkey '{}' - {}".format(key_str, description)):
                 return
-            # Refocus TruTops after confirmation
-            self._focus_trutops()
-            time.sleep(0.3)
+
+        # ALWAYS focus TruTops before hotkey
+        self._focus_trutops()
+        time.sleep(0.2)
 
         if not self.dry_run:
             pyautogui.hotkey(*keys)
@@ -626,10 +629,10 @@ class AutomationRunner:
                     self._click(no_save_pos[0], no_save_pos[1], "No (don't save)")
                     time.sleep(0.5)
 
-                # Step 3: Copy filename to clipboard and paste it
+                # Step 3: Copy filename (with extension only) to clipboard and paste it
                 # The filename box is already selected after clicking No
-                self._copy_to_clipboard(file_path)
-                print("[CLIPBOARD] Copied: {}".format(file_path))
+                self._copy_to_clipboard(file_name)  # Just filename, not full path
+                print("[CLIPBOARD] Copied: {}".format(file_name))
 
                 self._hotkey('ctrl', 'v', description="Paste filename")
                 time.sleep(0.3)
