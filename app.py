@@ -11,6 +11,7 @@ import os
 import json
 import threading
 import time
+import copy
 from pathlib import Path
 
 import pyautogui
@@ -43,8 +44,9 @@ class Config:
     """Handles loading and saving configuration."""
 
     def __init__(self):
-        self.data = DEFAULT_CONFIG.copy()
+        self.data = copy.deepcopy(DEFAULT_CONFIG)
         self.load()
+        print("[CONFIG] Loaded. click_locations: {}".format(self.data.get("click_locations")))
 
     def load(self):
         """Load configuration from file."""
@@ -866,13 +868,15 @@ class App(tk.Tk):
         coords = self.config.get("click_locations", "open_drawing")
         if coords:
             x, y = coords[0], coords[1]
-            print("TEST: Moving to ({}, {}) and clicking...".format(x, y))
+            messagebox.showinfo("Test Click", "Will move mouse to ({}, {}) and click.\n\nClick OK, then watch the mouse.".format(x, y))
+            print("TEST: Moving to ({}, {})...".format(x, y))
             pyautogui.moveTo(x, y)
+            print("TEST: Mouse moved. Clicking...")
             time.sleep(0.5)
             pyautogui.click()
-            print("TEST: Done")
+            print("TEST: Click done.")
         else:
-            print("No open_drawing coordinates set")
+            messagebox.showerror("Error", "No open_drawing coordinates set!\n\nUse Setup Locations first.")
 
     def _list_windows(self):
         """List all visible windows for debugging."""
@@ -940,6 +944,12 @@ class App(tk.Tk):
 def main():
     """Main entry point."""
     os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
+
+    print("=" * 50)
+    print("TruTops DWG to GEO Converter")
+    print("=" * 50)
+    print("Screen size: {}".format(pyautogui.size()))
+    print("")
 
     app = App()
     app.mainloop()
