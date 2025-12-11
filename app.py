@@ -759,8 +759,8 @@ class App(tk.Tk):
         super().__init__()
 
         self.title("TruTops DWG to GEO Converter")
-        self.geometry("720x680")
-        self.minsize(720, 680)
+        self.geometry("800x680")
+        self.minsize(800, 680)
 
         # Slate satin theme colors
         self.colors = {
@@ -885,7 +885,7 @@ class App(tk.Tk):
 
         tk.Label(
             info_frame,
-            text="Open > No > Paste > Enter > Enter > Save > TL > BR > Enter > Enter",
+            text="Open > No > Paste > Enter x2 > Save > TL > BR > Enter x2",
             font=("Consolas", 9),
             bg=self.colors["bg_light"],
             fg=self.colors["success"]
