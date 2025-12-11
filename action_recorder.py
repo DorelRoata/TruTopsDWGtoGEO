@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Action Recorder
 Records mouse clicks and keyboard presses to a log file for later review.
@@ -38,7 +39,7 @@ def on_click(x, y, button, pressed):
             "button": str(button)
         }
         actions.append(action)
-        print(f"[{action['time']}s] Mouse click at ({x}, {y}) - {button}")
+        print("[{}s] Mouse click at ({}, {}) - {}".format(action["time"], x, y, button))
 
 
 def on_key_press(key):
@@ -61,22 +62,23 @@ def on_key_press(key):
         "key": key_name
     }
     actions.append(action)
-    print(f"[{action['time']}s] Key press: {key_name}")
+    print("[{}s] Key press: {}".format(action["time"], key_name))
 
 
 def save_actions():
     """Save recorded actions to file."""
-    with open(LOG_FILE, 'w') as f:
-        f.write(f"# Action Recording - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write(f"# Total duration: {get_elapsed()} seconds\n")
-        f.write(f"# Total actions: {len(actions)}\n")
+    with open(LOG_FILE, "w", encoding="utf-8") as f:
+        f.write("# Action Recording - {}\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        f.write("# Total duration: {} seconds\n".format(get_elapsed()))
+        f.write("# Total actions: {}\n".format(len(actions)))
         f.write("#" + "=" * 60 + "\n\n")
 
         for i, action in enumerate(actions, 1):
             if action["type"] == "mouse_click":
-                f.write(f"{i}. [{action['time']}s] CLICK at ({action['x']}, {action['y']}) - {action['button']}\n")
+                f.write("{}. [{}s] CLICK at ({}, {}) - {}\n".format(
+                    i, action["time"], action["x"], action["y"], action["button"]))
             elif action["type"] == "key_press":
-                f.write(f"{i}. [{action['time']}s] KEY: {action['key']}\n")
+                f.write("{}. [{}s] KEY: {}\n".format(i, action["time"], action["key"]))
 
         f.write("\n" + "#" + "=" * 60 + "\n")
         f.write("# Suggested pyautogui code:\n")
@@ -86,23 +88,24 @@ def save_actions():
         for action in actions:
             delay = round(action["time"] - prev_time, 2)
             if delay > 0.1:
-                f.write(f"time.sleep({delay})\n")
+                f.write("time.sleep({})\n".format(delay))
 
             if action["type"] == "mouse_click":
-                f.write(f"pyautogui.click({action['x']}, {action['y']})  # {action['button']}\n")
+                f.write("pyautogui.click({}, {})  # {}\n".format(
+                    action["x"], action["y"], action["button"]))
             elif action["type"] == "key_press":
                 key = action["key"]
                 if key.startswith("Key."):
                     key = key.replace("Key.", "")
-                    f.write(f"pyautogui.press('{key}')\n")
+                    f.write("pyautogui.press('{}')\n".format(key))
                 elif len(key) == 1:
-                    f.write(f"pyautogui.press('{key}')\n")
+                    f.write("pyautogui.press('{}')\n".format(key))
                 else:
-                    f.write(f"pyautogui.hotkey({key})  # May need adjustment\n")
+                    f.write("pyautogui.hotkey({})  # May need adjustment\n".format(key))
 
             prev_time = action["time"]
 
-    print(f"\nActions saved to: {LOG_FILE}")
+    print("\nActions saved to: {}".format(LOG_FILE))
 
 
 def main():
@@ -142,8 +145,8 @@ def main():
 
     save_actions()
 
-    print(f"\nRecorded {len(actions)} actions in {get_elapsed()} seconds.")
-    print(f"Review the file: {LOG_FILE}")
+    print("\nRecorded {} actions in {} seconds.".format(len(actions), get_elapsed()))
+    print("Review the file: {}".format(LOG_FILE))
 
 
 if __name__ == "__main__":
