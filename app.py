@@ -2,6 +2,7 @@
 """
 TruTops DWG to GEO Converter
 A GUI automation tool for batch converting DWG files to GEO format.
+Press ESC at any time to abort automation.
 """
 
 import tkinter as tk
@@ -13,17 +14,17 @@ import time
 from pathlib import Path
 
 import pyautogui
-from PIL import Image, ImageGrab
-from pynput import mouse
+from PIL import Image, ImageGrab, ImageDraw, ImageTk
+from pynput import mouse, keyboard
 
 # Safety: Move mouse to top-left corner to abort
 pyautogui.FAILSAFE = True
 
 # Default configuration
 DEFAULT_CONFIG = {
-    "laser_folder": "laser",
     "import_delay": 3.0,
     "save_delay": 2.0,
+    "trutops_window_title": "TruTops",  # Window title to focus
     "click_locations": {
         "file_list": None,        # Where to click to focus file list in Open dialog
         "working_area": None,     # Click to highlight working area
@@ -34,92 +35,12 @@ DEFAULT_CONFIG = {
             "image": "ScreenShots/Save Selection.png",
             "fallback_coords": None
         },
-        "save_to_geo": {
-            "image": "screenshots/save_to_geo.png",
-            "fallback_coords": None
-        },
-        "ok": {
-            "image": "screenshots/ok.png",
-            "fallback_coords": None
-        }
     },
     "last_processed_index": 0
 }
 
 CONFIG_FILE = "config.json"
-SCREENSHOTS_DIR = "screenshots"
-
-
-class ClickIndicator:
-    """Shows a yellow circle where clicks happen."""
-
-    def __init__(self):
-        self.overlay = None
-        self.canvas = None
-
-    def show_at(self, x, y, duration=0.3):
-        """Show yellow circle at position for duration seconds."""
-        def _show():
-            # Create overlay window
-            self.overlay = tk.Tk()
-            self.overlay.overrideredirect(True)
-            self.overlay.attributes('-topmost', True)
-            self.overlay.attributes('-transparentcolor', 'black')
-            self.overlay.configure(bg='black')
-
-            # Size and position
-            size = 50
-            self.overlay.geometry("{}x{}+{}+{}".format(
-                size, size, x - size // 2, y - size // 2
-            ))
-
-            # Draw yellow circle
-            self.canvas = tk.Canvas(
-                self.overlay,
-                width=size,
-                height=size,
-                bg='black',
-                highlightthickness=0
-            )
-            self.canvas.pack()
-            self.canvas.create_oval(
-                5, 5, size - 5, size - 5,
-                outline='yellow',
-                width=4
-            )
-
-            # Auto-close after duration
-            self.overlay.after(int(duration * 1000), self._close)
-            self.overlay.mainloop()
-
-        # Run in separate thread to not block
-        threading.Thread(target=_show, daemon=True).start()
-
-    def _close(self):
-        """Close the overlay."""
-        if self.overlay:
-            self.overlay.destroy()
-            self.overlay = None
-
-
-def click_with_indicator(x, y, indicator=None):
-    """Click at position and show yellow indicator."""
-    if indicator:
-        indicator.show_at(x, y)
-    time.sleep(0.1)  # Brief pause for indicator to appear
-    pyautogui.click(x, y)
-
-
-def press_with_log(key, description=""):
-    """Press a key and log the action."""
-    print("[KEY] {} - {}".format(key, description))
-    pyautogui.press(key)
-
-
-def hotkey_with_log(keys, description=""):
-    """Press hotkey combination and log the action."""
-    print("[HOTKEY] {} - {}".format("+".join(keys), description))
-    pyautogui.hotkey(*keys)
+SCREENSHOTS_DIR = "ScreenShots"
 
 
 class Config:
@@ -135,7 +56,6 @@ class Config:
             try:
                 with open(CONFIG_FILE, 'r') as f:
                     saved = json.load(f)
-                    # Merge with defaults
                     self._deep_update(self.data, saved)
             except (json.JSONDecodeError, IOError):
                 pass
@@ -178,10 +98,7 @@ class ButtonDetector:
 
     @staticmethod
     def find_button(image_path, fallback_coords=None):
-        """
-        Try multiple strategies to find a button on screen.
-        Returns (center_point, strategy_name) or (None, "Not found").
-        """
+        """Find a button on screen using image detection."""
         if not image_path or not os.path.exists(image_path):
             if fallback_coords:
                 return tuple(fallback_coords), "Saved coordinates (no image)"
@@ -209,11 +126,88 @@ class ButtonDetector:
         except Exception:
             pass
 
-        # Final fallback: saved coordinates
         if fallback_coords:
             return tuple(fallback_coords), "Saved coordinates"
 
         return None, "Not found"
+
+
+class ClickIndicator:
+    """Shows a visual indicator where clicks happen using a simple approach."""
+
+    def __init__(self, app):
+        self.app = app
+        self.indicator_window = None
+
+    def show_click(self, x, y):
+        """Show a yellow circle at click position briefly."""
+        try:
+            # Create indicator window
+            self.indicator_window = tk.Toplevel(self.app)
+            self.indicator_window.overrideredirect(True)
+            self.indicator_window.attributes('-topmost', True)
+
+            # Try to make transparent (Windows)
+            try:
+                self.indicator_window.attributes('-transparentcolor', 'black')
+            except:
+                pass
+
+            size = 60
+            self.indicator_window.geometry("{}x{}+{}+{}".format(
+                size, size, x - size // 2, y - size // 2
+            ))
+            self.indicator_window.configure(bg='black')
+
+            # Draw circle
+            canvas = tk.Canvas(
+                self.indicator_window,
+                width=size, height=size,
+                bg='black', highlightthickness=0
+            )
+            canvas.pack()
+            canvas.create_oval(5, 5, size-5, size-5, outline='yellow', width=4)
+
+            # Auto-close after 200ms
+            self.indicator_window.after(200, self._close_indicator)
+
+        except Exception as e:
+            print("Indicator error: {}".format(e))
+
+    def _close_indicator(self):
+        """Close the indicator window."""
+        if self.indicator_window:
+            try:
+                self.indicator_window.destroy()
+            except:
+                pass
+            self.indicator_window = None
+
+    def show_keypress(self, key):
+        """Show a key press indicator."""
+        try:
+            self.indicator_window = tk.Toplevel(self.app)
+            self.indicator_window.overrideredirect(True)
+            self.indicator_window.attributes('-topmost', True)
+
+            # Position at top-center of screen
+            screen_width = self.app.winfo_screenwidth()
+            self.indicator_window.geometry("+{}+50".format(screen_width // 2 - 50))
+            self.indicator_window.configure(bg='yellow')
+
+            label = tk.Label(
+                self.indicator_window,
+                text="[{}]".format(key.upper()),
+                font=("Arial", 16, "bold"),
+                bg='yellow', fg='black',
+                padx=10, pady=5
+            )
+            label.pack()
+
+            self.indicator_window.after(200, self._close_indicator)
+
+        except Exception as e:
+            print("Indicator error: {}".format(e))
 
 
 class LocationSetupDialog(tk.Toplevel):
@@ -223,8 +217,8 @@ class LocationSetupDialog(tk.Toplevel):
         super().__init__(parent)
         self.config = config
         self.title("Setup Click Locations")
-        self.geometry("500x500")
-        self.resizable(False, False)
+        self.geometry("500x400")
+        self.resizable(True, True)
         self.transient(parent)
         self.grab_set()
 
@@ -246,8 +240,8 @@ class LocationSetupDialog(tk.Toplevel):
 
         ttk.Label(
             instr_frame,
-            text="Click CAPTURE for each location, then click the corresponding\n"
-                 "button/area in TrueTops within 5 seconds.",
+            text="Click CAPTURE, then click the location in TrueTops within 5 seconds.\n"
+                 "Make sure TrueTops is visible before capturing.",
             wraplength=450
         ).pack()
 
@@ -273,8 +267,6 @@ class LocationSetupDialog(tk.Toplevel):
             status.pack(side="left", padx=10)
             self.status_labels[key] = status
 
-            ttk.Label(row, text=desc, foreground="gray").pack(side="right")
-
         # Countdown label
         self.countdown_label = ttk.Label(self, text="", font=("Arial", 14, "bold"))
         self.countdown_label.pack(pady=10)
@@ -287,7 +279,7 @@ class LocationSetupDialog(tk.Toplevel):
         ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(side="left", padx=5)
 
     def _update_status(self):
-        """Update status labels based on existing config."""
+        """Update status labels."""
         for key in self.locations:
             coords = self.config.get("click_locations", key)
             if coords:
@@ -300,7 +292,7 @@ class LocationSetupDialog(tk.Toplevel):
                 self.captured[key] = False
 
     def _start_capture(self, location_key):
-        """Start the capture countdown."""
+        """Start capture countdown."""
         for btn in self.capture_buttons.values():
             btn.config(state="disabled")
 
@@ -316,7 +308,7 @@ class LocationSetupDialog(tk.Toplevel):
         """Countdown and wait for click."""
         for i in range(5, 0, -1):
             self.after(0, lambda i=i: self.countdown_label.config(
-                text="Click the location in {}...".format(i)
+                text="Click in {}...".format(i)
             ))
             time.sleep(1)
 
@@ -354,23 +346,9 @@ class LocationSetupDialog(tk.Toplevel):
                 text="Set: ({}, {})".format(x, y),
                 foreground="green"
             )
-        else:
-            messagebox.showerror("Capture Failed", "Timeout - no click detected")
 
     def _save(self):
-        """Save and close dialog."""
-        missing = [name for key, (name, _) in self.locations.items()
-                   if not self.captured.get(key)]
-
-        if missing:
-            if not messagebox.askyesno(
-                "Incomplete Setup",
-                "These locations are not set:\n- {}\n\nContinue anyway?".format(
-                    "\n- ".join(missing)
-                )
-            ):
-                return
-
+        """Save and close."""
         self.config.save()
         self.destroy()
 
@@ -382,79 +360,126 @@ class AutomationRunner:
         self.app = app
         self.config = app.config
         self.running = False
-        self.paused = False
         self.current_index = 0
-        self.indicator = ClickIndicator()
+        self.indicator = ClickIndicator(app)
+        self.escape_pressed = False
+        self.keyboard_listener = None
 
     def start(self, files, dry_run=False):
         """Start processing files."""
         self.running = True
-        self.paused = False
+        self.escape_pressed = False
         self.files = files
         self.dry_run = dry_run
         self.current_index = self.config.get("last_processed_index") or 0
 
         # Ask if resuming
         if self.current_index > 0 and self.current_index < len(files):
-            if messagebox.askyesno(
+            if not messagebox.askyesno(
                 "Resume?",
-                "Previous session stopped at file {}.\nResume from there?".format(
-                    self.current_index + 1
-                )
+                "Resume from file {}?".format(self.current_index + 1)
             ):
-                pass
-            else:
                 self.current_index = 0
         else:
             self.current_index = 0
+
+        # Start ESC listener
+        self._start_escape_listener()
 
         threading.Thread(target=self._run, daemon=True).start()
 
     def stop(self):
         """Stop processing."""
         self.running = False
-        self.app.update_status("Stopped by user")
+        self._stop_escape_listener()
+        self.app.update_status("Stopped")
+
+    def _start_escape_listener(self):
+        """Start listening for ESC key."""
+        def on_press(key):
+            if key == keyboard.Key.esc:
+                print("\n[ESC PRESSED] Aborting automation...")
+                self.escape_pressed = True
+                self.running = False
+                return False
+
+        self.keyboard_listener = keyboard.Listener(on_press=on_press)
+        self.keyboard_listener.start()
+
+    def _stop_escape_listener(self):
+        """Stop ESC listener."""
+        if self.keyboard_listener:
+            self.keyboard_listener.stop()
+            self.keyboard_listener = None
+
+    def _focus_trutops(self):
+        """Try to focus TrueTops window."""
+        try:
+            import subprocess
+            # Try to find and activate TrueTops window (Windows)
+            title = self.config.get("trutops_window_title") or "TruTops"
+
+            # Use pyautogui to click on taskbar or use Windows API
+            windows = pyautogui.getWindowsWithTitle(title)
+            if windows:
+                win = windows[0]
+                win.activate()
+                time.sleep(0.3)
+                print("[FOCUS] Activated TrueTops window")
+                return True
+            else:
+                print("[FOCUS] TrueTops window not found - make sure it's open")
+                return False
+        except Exception as e:
+            print("[FOCUS] Could not focus window: {}".format(e))
+            return False
 
     def _click(self, x, y, description=""):
-        """Click with indicator and logging."""
+        """Click with indicator."""
         print("[CLICK] ({}, {}) - {}".format(x, y, description))
         if not self.dry_run:
-            self.indicator.show_at(x, y)
-            time.sleep(0.15)
+            # Show indicator on main thread
+            self.app.after(0, lambda: self.indicator.show_click(x, y))
+            time.sleep(0.1)
             pyautogui.click(x, y)
         else:
-            print("  (dry run - skipped)")
+            print("  (dry run)")
 
     def _press(self, key, description=""):
-        """Press key with logging."""
+        """Press key with indicator."""
         print("[KEY] {} - {}".format(key, description))
         if not self.dry_run:
+            self.app.after(0, lambda: self.indicator.show_keypress(key))
+            time.sleep(0.1)
             pyautogui.press(key)
         else:
-            print("  (dry run - skipped)")
+            print("  (dry run)")
 
     def _hotkey(self, *keys, description=""):
-        """Press hotkey with logging."""
+        """Press hotkey."""
         print("[HOTKEY] {} - {}".format("+".join(keys), description))
         if not self.dry_run:
+            key_str = "+".join(keys)
+            self.app.after(0, lambda: self.indicator.show_keypress(key_str))
+            time.sleep(0.1)
             pyautogui.hotkey(*keys)
         else:
-            print("  (dry run - skipped)")
+            print("  (dry run)")
 
     def _click_button_by_image(self, button_key, description):
-        """Find and click a button using image detection. Returns True on success."""
+        """Find and click a button using image detection."""
         image_path = self.config.get("buttons", button_key, "image")
         fallback = self.config.get("buttons", button_key, "fallback_coords")
 
         pos, strategy = ButtonDetector.find_button(image_path, fallback)
 
         if pos:
-            print("[IMAGE DETECT] Found '{}' via {} at ({}, {})".format(
+            print("[IMAGE] Found '{}' via {} at ({}, {})".format(
                 description, strategy, pos[0], pos[1]))
             self._click(pos[0], pos[1], description)
             return True
         else:
-            print("[IMAGE DETECT] Could not find '{}'".format(description))
+            print("[IMAGE] Could not find '{}'".format(description))
             return False
 
     def _run(self):
@@ -462,62 +487,74 @@ class AutomationRunner:
         import_delay = self.config.get("import_delay") or 3.0
         save_delay = self.config.get("save_delay") or 2.0
 
-        # Get click locations
         file_list_pos = self.config.get("click_locations", "file_list")
         working_area_pos = self.config.get("click_locations", "working_area")
         deselect_pos = self.config.get("click_locations", "deselect")
 
         total = len(self.files)
 
+        # Focus TrueTops first
+        print("\n" + "=" * 50)
+        print("STARTING AUTOMATION - Press ESC to abort")
+        print("=" * 50)
+
+        self._focus_trutops()
+        time.sleep(0.5)
+
         for i in range(self.current_index, total):
-            if not self.running:
+            if not self.running or self.escape_pressed:
                 break
 
             file = self.files[i]
             self.current_index = i
-
-            # Save progress
             self.config.set("last_processed_index", i)
 
             # Update UI
-            self.app.after(0, lambda i=i, f=file: self.app.update_file_status(i, "processing"))
+            self.app.after(0, lambda i=i: self.app.update_file_status(i, "processing"))
             self.app.after(0, lambda f=file, i=i, t=total: self.app.update_status(
-                "Processing {} ({}/{})...".format(f, i + 1, t)
+                "Processing {} ({}/{}) - ESC to abort".format(f, i + 1, t)
             ))
             self.app.after(0, lambda i=i, t=total: self.app.update_progress(i, t))
 
             try:
-                print("\n" + "=" * 50)
-                print("Processing file {}/{}: {}".format(i + 1, total, file))
-                print("=" * 50)
+                print("\n--- File {}/{}: {} ---".format(i + 1, total, file))
 
                 # Step 1: Open Drawing (Ctrl+O)
-                self._hotkey('ctrl', 'o', description="Open Drawing dialog")
+                self._hotkey('ctrl', 'o', description="Open Drawing")
                 time.sleep(1.0)
 
-                # Step 2: Navigate to next file in dialog
+                if not self.running:
+                    break
+
+                # Step 2: Navigate to file
                 if file_list_pos:
                     self._click(file_list_pos[0], file_list_pos[1], "Focus file list")
                     time.sleep(0.3)
 
                 if i > 0:
-                    # Move to next file
-                    self._press('down', "Select next file")
+                    self._press('down', "Next file")
                     time.sleep(0.2)
 
-                self._press('enter', "Open selected file")
+                self._press('enter', "Open file")
                 time.sleep(import_delay)
 
-                # Step 3: Save Selected (using image detection)
+                if not self.running:
+                    break
+
+                # Step 3: Save Selected
                 if not self._click_button_by_image("save_selected", "Save Selected"):
-                    self.app.after(0, lambda: self.app.update_status("Could not find Save Selected button"))
+                    self.app.after(0, lambda: messagebox.showerror(
+                        "Error", "Could not find Save Selected button"))
                     self.running = False
                     break
                 time.sleep(0.5)
 
-                # Step 4: Highlight working area
+                if not self.running:
+                    break
+
+                # Step 4: Working area
                 if working_area_pos:
-                    self._click(working_area_pos[0], working_area_pos[1], "Highlight working area")
+                    self._click(working_area_pos[0], working_area_pos[1], "Working area")
                     time.sleep(0.5)
 
                 # Step 5: Deselect
@@ -525,13 +562,13 @@ class AutomationRunner:
                     self._click(deselect_pos[0], deselect_pos[1], "Deselect")
                     time.sleep(0.5)
 
-                # Step 6: Press Enter to save with new name
-                self._press('enter', "Confirm save")
+                # Step 6: Enter to save
+                self._press('enter', "Save")
                 time.sleep(save_delay)
 
                 # Mark complete
                 self.app.after(0, lambda i=i: self.app.update_file_status(i, "done"))
-                print("File {} complete!".format(file))
+                print("Done!")
 
             except Exception as e:
                 print("ERROR: {}".format(e))
@@ -539,12 +576,17 @@ class AutomationRunner:
                 self.running = False
                 break
 
-        if self.running:
-            # All done
+        # Cleanup
+        self._stop_escape_listener()
+
+        if self.escape_pressed:
+            self.app.after(0, lambda: self.app.update_status("Aborted by user (ESC)"))
+            self.app.after(0, lambda: messagebox.showinfo("Aborted", "Automation stopped by ESC key"))
+        elif self.running:
             self.config.set("last_processed_index", 0)
-            self.app.after(0, lambda: self.app.update_status("All files processed!"))
+            self.app.after(0, lambda: self.app.update_status("Complete!"))
             self.app.after(0, lambda: self.app.update_progress(total, total))
-            self.app.after(0, lambda: messagebox.showinfo("Complete", "Processed {} files!".format(total)))
+            self.app.after(0, lambda: messagebox.showinfo("Done", "Processed {} files!".format(total)))
 
         self.running = False
         self.app.after(0, self.app.on_automation_stopped)
@@ -557,42 +599,43 @@ class App(tk.Tk):
         super().__init__()
 
         self.title("TruTops DWG to GEO Converter")
-        self.geometry("550x600")
-        self.resizable(True, True)
+        self.geometry("500x500")
+        self.minsize(400, 400)
 
         self.config = Config()
         self.automation = AutomationRunner(self)
         self.files = []
-        self.file_status = {}  # index -> status (pending/processing/done)
+        self.file_status = {}
 
         self._create_widgets()
-        self._load_files()
 
     def _create_widgets(self):
         """Create main window widgets."""
-        # Folder selection
-        folder_frame = ttk.LabelFrame(self, text="Laser Folder", padding=10)
-        folder_frame.pack(fill="x", padx=10, pady=10)
+        # Header
+        header = ttk.Label(
+            self,
+            text="TruTops DWG to GEO Converter",
+            font=("Arial", 14, "bold")
+        )
+        header.pack(pady=10)
 
-        folder_row = ttk.Frame(folder_frame)
-        folder_row.pack(fill="x")
-
-        self.folder_var = tk.StringVar(value=self.config.get("laser_folder") or "laser")
-        self.folder_entry = ttk.Entry(folder_row, textvariable=self.folder_var, width=40)
-        self.folder_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
-
-        ttk.Button(folder_row, text="Browse", command=self._browse_folder).pack(side="left")
-
-        # File list
-        list_frame = ttk.LabelFrame(self, text="Files Found", padding=10)
+        # File list frame
+        list_frame = ttk.LabelFrame(self, text="DWG Files to Process", padding=10)
         list_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
-        self.file_count_label = ttk.Label(list_frame, text="0 DWG files")
-        self.file_count_label.pack(anchor="w")
+        # Add files button
+        btn_row = ttk.Frame(list_frame)
+        btn_row.pack(fill="x", pady=(0, 5))
+
+        ttk.Button(btn_row, text="Add Files", command=self._add_files).pack(side="left")
+        ttk.Button(btn_row, text="Clear", command=self._clear_files).pack(side="left", padx=5)
+
+        self.file_count_label = ttk.Label(btn_row, text="0 files")
+        self.file_count_label.pack(side="right")
 
         # Listbox with scrollbar
         list_container = ttk.Frame(list_frame)
-        list_container.pack(fill="both", expand=True, pady=5)
+        list_container.pack(fill="both", expand=True)
 
         scrollbar = ttk.Scrollbar(list_container)
         scrollbar.pack(side="right", fill="y")
@@ -606,18 +649,16 @@ class App(tk.Tk):
         self.file_listbox.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=self.file_listbox.yview)
 
-        # Status and progress
+        # Status
         status_frame = ttk.Frame(self)
         status_frame.pack(fill="x", padx=10, pady=5)
 
-        self.status_label = ttk.Label(status_frame, text="Ready")
+        self.status_label = ttk.Label(status_frame, text="Ready - Add DWG files to start")
         self.status_label.pack(anchor="w")
 
         self.progress_var = tk.DoubleVar(value=0)
         self.progress_bar = ttk.Progressbar(
-            status_frame,
-            variable=self.progress_var,
-            maximum=100
+            status_frame, variable=self.progress_var, maximum=100
         )
         self.progress_bar.pack(fill="x", pady=5)
 
@@ -636,96 +677,81 @@ class App(tk.Tk):
 
         ttk.Button(btn_frame, text="Setup Locations", command=self._setup_locations).pack(side="left", padx=5)
 
-        ttk.Button(btn_frame, text="Refresh", command=self._load_files).pack(side="right", padx=5)
-
         # Options
         options_frame = ttk.Frame(self)
         options_frame.pack(fill="x", padx=10, pady=5)
 
         self.dry_run_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
-            options_frame,
-            text="Dry Run (simulate without clicking)",
+            options_frame, text="Dry Run (no clicks)",
             variable=self.dry_run_var
         ).pack(anchor="w")
 
-        # Workflow info
-        info_frame = ttk.LabelFrame(self, text="Workflow", padding=10)
+        # Info
+        info_frame = ttk.LabelFrame(self, text="Workflow (Press ESC to abort)", padding=5)
         info_frame.pack(fill="x", padx=10, pady=5)
 
         ttk.Label(
             info_frame,
-            text="1. Ctrl+O (Open Drawing)\n"
-                 "2. Click file list -> Down -> Enter (select next file)\n"
-                 "3. Save Selected (image detection)\n"
-                 "4. Click Working Area\n"
-                 "5. Click Deselect\n"
-                 "6. Enter (save with new name)",
-            font=("Consolas", 9),
-            foreground="gray"
+            text="1. Ctrl+O  2. Select file  3. Save Selected (image)\n"
+                 "4. Working Area  5. Deselect  6. Enter",
+            font=("Consolas", 9), foreground="gray"
         ).pack(anchor="w")
 
-    def _browse_folder(self):
-        """Open folder browser."""
-        folder = filedialog.askdirectory(
-            initialdir=self.folder_var.get(),
-            title="Select Laser Folder"
+    def _add_files(self):
+        """Add DWG files."""
+        files = filedialog.askopenfilenames(
+            title="Select DWG Files",
+            filetypes=[("DWG files", "*.dwg"), ("All files", "*.*")]
         )
-        if folder:
-            self.folder_var.set(folder)
-            self.config.set("laser_folder", folder)
-            self._load_files()
+        if files:
+            for f in files:
+                if f not in self.files:
+                    self.files.append(f)
 
-    def _load_files(self):
-        """Load DWG files from folder."""
-        folder = self.folder_var.get()
+            self._update_file_list()
+
+    def _clear_files(self):
+        """Clear file list."""
         self.files = []
         self.file_status = {}
+        self._update_file_list()
 
-        if os.path.exists(folder):
-            self.files = sorted([
-                f for f in os.listdir(folder)
-                if f.lower().endswith('.dwg')
-            ])
-
-        # Update listbox
+    def _update_file_list(self):
+        """Update the file listbox."""
         self.file_listbox.delete(0, tk.END)
         for i, f in enumerate(self.files):
-            self.file_listbox.insert(tk.END, "  {}".format(f))
+            name = os.path.basename(f)
+            self.file_listbox.insert(tk.END, "  {}".format(name))
             self.file_status[i] = "pending"
 
-        self.file_count_label.config(text="{} DWG files".format(len(self.files)))
+        self.file_count_label.config(text="{} files".format(len(self.files)))
         self.update_progress(0, len(self.files) or 1)
 
     def _start(self):
         """Start automation."""
         if not self.files:
-            messagebox.showwarning("No Files", "No DWG files found in folder.")
+            messagebox.showwarning("No Files", "Add DWG files first.")
             return
 
-        # Check if locations are configured
+        # Check locations
         required = ["file_list", "working_area", "deselect"]
         missing = [loc for loc in required if not self.config.get("click_locations", loc)]
 
         if missing:
             if messagebox.askyesno(
                 "Setup Required",
-                "Some click locations are not configured:\n- {}\n\n"
-                "Run Setup Locations first?".format("\n- ".join(missing))
+                "Click locations not set. Run Setup?"
             ):
                 self._setup_locations()
                 return
 
-        # Disable controls
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
-        self.folder_entry.config(state="disabled")
 
-        # Reset file status
         for i in range(len(self.files)):
             self.update_file_status(i, "pending")
 
-        # Start automation
         self.automation.start(self.files, dry_run=self.dry_run_var.get())
 
     def _stop(self):
@@ -733,7 +759,7 @@ class App(tk.Tk):
         self.automation.stop()
 
     def _setup_locations(self):
-        """Open location setup dialog."""
+        """Open setup dialog."""
         LocationSetupDialog(self, self.config)
 
     def update_status(self, text):
@@ -752,33 +778,19 @@ class App(tk.Tk):
             return
 
         self.file_status[index] = status
+        name = os.path.basename(self.files[index])
 
-        prefix = {
-            "pending": "  ",
-            "processing": "> ",
-            "done": "  "
-        }.get(status, "  ")
+        prefix = {"pending": "  ", "processing": "> ", "done": "  "}.get(status, "  ")
+        suffix = {"pending": "", "processing": " ...", "done": " [Done]"}.get(status, "")
 
-        suffix = {
-            "pending": "",
-            "processing": " ...",
-            "done": " [Done]"
-        }.get(status, "")
-
-        text = "{}{}{}".format(prefix, self.files[index], suffix)
+        text = "{}{}{}".format(prefix, name, suffix)
 
         self.file_listbox.delete(index)
         self.file_listbox.insert(index, text)
 
-        # Color coding
-        if status == "done":
-            self.file_listbox.itemconfig(index, foreground="green")
-        elif status == "processing":
-            self.file_listbox.itemconfig(index, foreground="blue")
-        else:
-            self.file_listbox.itemconfig(index, foreground="black")
+        colors = {"done": "green", "processing": "blue", "pending": "black"}
+        self.file_listbox.itemconfig(index, foreground=colors.get(status, "black"))
 
-        # Scroll to show current item
         if status == "processing":
             self.file_listbox.see(index)
 
@@ -786,14 +798,11 @@ class App(tk.Tk):
         """Called when automation stops."""
         self.start_btn.config(state="normal")
         self.stop_btn.config(state="disabled")
-        self.folder_entry.config(state="normal")
 
 
 def main():
     """Main entry point."""
-    # Ensure required directories exist
     os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
-    os.makedirs("laser", exist_ok=True)
 
     app = App()
     app.mainloop()
