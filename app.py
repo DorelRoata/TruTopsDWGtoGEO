@@ -422,23 +422,62 @@ class AutomationRunner:
     def _focus_trutops(self):
         """Try to focus TrueTops window."""
         try:
-            import subprocess
-            # Try to find and activate TrueTops window (Windows)
             title = self.config.get("trutops_window_title") or "TruTops"
 
-            # Use pyautogui to click on taskbar or use Windows API
+            # Try pyautogui first
             windows = pyautogui.getWindowsWithTitle(title)
             if windows:
                 win = windows[0]
-                win.activate()
-                time.sleep(0.3)
-                print("[FOCUS] Activated TrueTops window")
-                return True
-            else:
-                print("[FOCUS] TrueTops window not found - make sure it's open")
+                try:
+                    # Try multiple activation methods
+                    win.minimize()
+                    win.restore()
+                    win.activate()
+                    time.sleep(0.3)
+                    print("[FOCUS] Activated: {}".format(win.title))
+                    return True
+                except Exception as e:
+                    print("[FOCUS] pyautogui activate failed: {}".format(e))
+
+            # Fallback: Try win32gui directly
+            try:
+                import win32gui
+                import win32con
+
+                def find_window(hwnd, windows_list):
+                    if win32gui.IsWindowVisible(hwnd):
+                        window_title = win32gui.GetWindowText(hwnd)
+                        if title.lower() in window_title.lower():
+                            windows_list.append((hwnd, window_title))
+
+                found = []
+                win32gui.EnumWindows(find_window, found)
+
+                if found:
+                    hwnd, win_title = found[0]
+                    # Force to foreground
+                    win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                    win32gui.SetForegroundWindow(hwnd)
+                    time.sleep(0.3)
+                    print("[FOCUS] win32gui activated: {}".format(win_title))
+                    return True
+                else:
+                    # List all windows for debugging
+                    all_windows = []
+                    win32gui.EnumWindows(lambda h, l: l.append(win32gui.GetWindowText(h)) if win32gui.GetWindowText(h) else None, all_windows)
+                    print("[FOCUS] Window '{}' not found!".format(title))
+                    print("[FOCUS] Available windows containing 'tru':")
+                    for w in all_windows:
+                        if 'tru' in w.lower():
+                            print("  - {}".format(w))
+                    return False
+
+            except ImportError:
+                print("[FOCUS] win32gui not available - install pywin32: pip install pywin32")
                 return False
+
         except Exception as e:
-            print("[FOCUS] Could not focus window: {}".format(e))
+            print("[FOCUS] Error: {}".format(e))
             return False
 
     def _wait_for_confirm(self, action_desc):
