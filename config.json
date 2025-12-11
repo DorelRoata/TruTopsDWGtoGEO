@@ -3,21 +3,29 @@
   "save_delay": 2.0,
   "trutops_window_title": "TruTops",
   "click_locations": {
-    "file_list": [
-      638,
-      1372
+    "open_drawing": [
+      2760,
+      2118
     ],
     "no_save": [
-      2636,
-      1580
+      3166,
+      820
+    ],
+    "save_selected": [
+      2727,
+      2107
     ],
     "select_top_left": [
-      487,
-      1017
+      2770,
+      2129
     ],
     "select_bottom_right": [
-      2696,
-      2122
+      2273,
+      792
+    ],
+    "file_list": [
+      2697,
+      2108
     ],
     "deselect": [
       2643,
@@ -26,12 +34,9 @@
     "working_area": [
       2726,
       2136
-    ],
-    "save_selected": [
-      2739,
-      2129
     ]
   },
+  "last_processed_index": 4,
   "buttons": {
     "save_selected": {
       "image": "ScreenShots/Save Selection.png",
@@ -46,6 +51,5 @@
       "fallback_coords": null
     }
   },
-  "last_processed_index": 2,
   "laser_folder": "Z:/ACI_Laser/Western Smokehouse Partners/4858 WSP Cutter Boxes/11GA2B"
 }
