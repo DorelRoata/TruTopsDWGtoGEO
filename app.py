@@ -225,8 +225,8 @@ class LocationSetupDialog(tk.Toplevel):
         self.parent = parent
         self.config = config
         self.title("Setup Click Locations")
-        self.geometry("580x580")
-        self.minsize(580, 580)
+        self.geometry("650x580")
+        self.minsize(650, 580)
         self.transient(parent)
         self.grab_set()
 
@@ -294,7 +294,8 @@ class LocationSetupDialog(tk.Toplevel):
 
             status = tk.Label(
                 frame, text="Not set", font=("Consolas", 9),
-                bg=self.colors["bg_light"], fg=self.colors["accent"]
+                bg=self.colors["bg_light"], fg=self.colors["accent"],
+                width=14, anchor="e"
             )
             status.pack(side="right", padx=(10, 0))
             self.status_labels[key] = status
@@ -758,8 +759,8 @@ class App(tk.Tk):
         super().__init__()
 
         self.title("TruTops DWG to GEO Converter")
-        self.geometry("620x680")
-        self.minsize(620, 680)
+        self.geometry("720x680")
+        self.minsize(720, 680)
 
         # Slate satin theme colors
         self.colors = {
