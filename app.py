@@ -872,16 +872,24 @@ class App(tk.Tk):
         ttk.Button(btn_frame, text="Setup Locations", command=self._setup_locations).pack(side="left")
 
         # Info
-        info_frame = tk.Frame(self, bg=self.colors["bg_light"], padx=12, pady=10)
+        info_frame = tk.Frame(self, bg=self.colors["bg_light"], padx=12, pady=8)
         info_frame.pack(fill="x", padx=15, pady=10)
 
         tk.Label(
             info_frame,
-            text="Workflow (ESC to abort):  Open > No > Paste > Enter > Enter > Save > TL > BR > Enter > Enter",
-            font=("Consolas", 8),
+            text="Workflow (ESC to abort):",
+            font=("Segoe UI", 9, "bold"),
             bg=self.colors["bg_light"],
-            fg=self.colors["accent"]
+            fg=self.colors["success"]
         ).pack(anchor="w")
+
+        tk.Label(
+            info_frame,
+            text="Open > No > Paste > Enter > Enter > Save > TL > BR > Enter > Enter",
+            font=("Consolas", 9),
+            bg=self.colors["bg_light"],
+            fg=self.colors["success"]
+        ).pack(anchor="w", pady=(4, 0))
 
     def _add_files(self):
         """Add DWG files."""
