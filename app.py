@@ -687,8 +687,34 @@ class App(tk.Tk):
         super().__init__()
 
         self.title("TruTops DWG to GEO Converter")
-        self.geometry("700x650")
-        self.minsize(700, 650)
+        self.geometry("600x700")
+        self.minsize(600, 700)
+
+        # Slate satin theme colors
+        self.colors = {
+            "bg": "#2d3436",           # Dark slate background
+            "bg_light": "#3d4448",     # Lighter slate for frames
+            "fg": "#dfe6e9",           # Light gray text
+            "accent": "#636e72",       # Medium slate accent
+            "highlight": "#74b9ff",    # Blue highlight
+            "success": "#00b894",      # Green for done
+            "processing": "#fdcb6e",   # Yellow for processing
+        }
+
+        self.configure(bg=self.colors["bg"])
+
+        # Configure ttk styles
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
+
+        self.style.configure("TFrame", background=self.colors["bg"])
+        self.style.configure("TLabel", background=self.colors["bg"], foreground=self.colors["fg"])
+        self.style.configure("TLabelframe", background=self.colors["bg_light"], foreground=self.colors["fg"])
+        self.style.configure("TLabelframe.Label", background=self.colors["bg"], foreground=self.colors["fg"])
+        self.style.configure("TButton", background=self.colors["accent"], foreground=self.colors["fg"], padding=6)
+        self.style.map("TButton", background=[("active", self.colors["highlight"])])
+        self.style.configure("TCheckbutton", background=self.colors["bg"], foreground=self.colors["fg"])
+        self.style.configure("TProgressbar", background=self.colors["highlight"], troughcolor=self.colors["bg_light"])
 
         self.config = Config()
         self.automation = AutomationRunner(self)
@@ -700,20 +726,22 @@ class App(tk.Tk):
     def _create_widgets(self):
         """Create main window widgets."""
         # Header
-        header = ttk.Label(
+        header = tk.Label(
             self,
             text="TruTops DWG to GEO Converter",
-            font=("Arial", 14, "bold")
+            font=("Segoe UI", 16, "bold"),
+            bg=self.colors["bg"],
+            fg=self.colors["fg"]
         )
-        header.pack(pady=10)
+        header.pack(pady=15)
 
         # File list frame
         list_frame = ttk.LabelFrame(self, text="DWG Files to Process", padding=10)
-        list_frame.pack(fill="both", expand=True, padx=10, pady=5)
+        list_frame.pack(fill="both", expand=True, padx=15, pady=5)
 
         # Add files button
         btn_row = ttk.Frame(list_frame)
-        btn_row.pack(fill="x", pady=(0, 5))
+        btn_row.pack(fill="x", pady=(0, 8))
 
         ttk.Button(btn_row, text="Add Files", command=self._add_files).pack(side="left")
         ttk.Button(btn_row, text="Clear", command=self._clear_files).pack(side="left", padx=5)
@@ -732,14 +760,20 @@ class App(tk.Tk):
             list_container,
             yscrollcommand=scrollbar.set,
             font=("Consolas", 10),
-            selectmode="single"
+            selectmode="single",
+            bg=self.colors["bg_light"],
+            fg=self.colors["fg"],
+            selectbackground=self.colors["highlight"],
+            selectforeground="#000000",
+            highlightthickness=0,
+            bd=0
         )
         self.file_listbox.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=self.file_listbox.yview)
 
         # Status
         status_frame = ttk.Frame(self)
-        status_frame.pack(fill="x", padx=10, pady=5)
+        status_frame.pack(fill="x", padx=15, pady=8)
 
         self.status_label = ttk.Label(status_frame, text="Ready - Add DWG files to start")
         self.status_label.pack(anchor="w")
@@ -748,51 +782,52 @@ class App(tk.Tk):
         self.progress_bar = ttk.Progressbar(
             status_frame, variable=self.progress_var, maximum=100
         )
-        self.progress_bar.pack(fill="x", pady=5)
+        self.progress_bar.pack(fill="x", pady=8)
 
         self.progress_label = ttk.Label(status_frame, text="0/0")
         self.progress_label.pack(anchor="e")
 
         # Control buttons
         btn_frame = ttk.Frame(self)
-        btn_frame.pack(fill="x", padx=10, pady=10)
+        btn_frame.pack(fill="x", padx=15, pady=10)
 
         self.start_btn = ttk.Button(btn_frame, text="START", command=self._start)
-        self.start_btn.pack(side="left", padx=5)
+        self.start_btn.pack(side="left", padx=(0, 8))
 
         self.stop_btn = ttk.Button(btn_frame, text="STOP", command=self._stop, state="disabled")
-        self.stop_btn.pack(side="left", padx=5)
+        self.stop_btn.pack(side="left", padx=(0, 8))
 
-        ttk.Button(btn_frame, text="Setup Locations", command=self._setup_locations).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="List Windows", command=self._list_windows).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="TEST CLICK", command=self._test_click).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Setup Locations", command=self._setup_locations).pack(side="left")
 
         # Options
         options_frame = ttk.Frame(self)
-        options_frame.pack(fill="x", padx=10, pady=5)
+        options_frame.pack(fill="x", padx=15, pady=5)
 
         self.dry_run_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             options_frame, text="Dry Run (no clicks)",
             variable=self.dry_run_var
-        ).pack(anchor="w")
+        ).pack(anchor="w", pady=2)
 
         self.step_by_step_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
-            options_frame, text="Step-by-step (confirm each action in console)",
+            options_frame, text="Step-by-step (confirm each action)",
             variable=self.step_by_step_var
-        ).pack(anchor="w")
+        ).pack(anchor="w", pady=2)
 
         # Info
-        info_frame = ttk.LabelFrame(self, text="Workflow (Press ESC to abort)", padding=5)
-        info_frame.pack(fill="x", padx=10, pady=5)
+        info_frame = ttk.LabelFrame(self, text="Workflow (ESC to abort)", padding=8)
+        info_frame.pack(fill="x", padx=15, pady=10)
 
-        ttk.Label(
+        tk.Label(
             info_frame,
-            text="1. Open Drawing (click)  2. No  3. Paste filename\n"
-                 "4. Enter (open)  5. Enter (import)  6. Save Selected\n"
-                 "7. TL corner  8. BR corner  9. Enter  10. Enter (save)",
-            font=("Consolas", 9), foreground="gray"
+            text="1. Open Drawing  2. No  3. Paste filename  4. Enter\n"
+                 "5. Enter (import)  6. Save Selected  7. Select TL\n"
+                 "8. Select BR  9. Enter (warning)  10. Enter (save)",
+            font=("Consolas", 9),
+            bg=self.colors["bg_light"],
+            fg=self.colors["accent"],
+            justify="left"
         ).pack(anchor="w")
 
     def _add_files(self):
@@ -929,8 +964,12 @@ class App(tk.Tk):
         self.file_listbox.delete(index)
         self.file_listbox.insert(index, text)
 
-        colors = {"done": "green", "processing": "blue", "pending": "black"}
-        self.file_listbox.itemconfig(index, foreground=colors.get(status, "black"))
+        colors = {
+            "done": self.colors["success"],
+            "processing": self.colors["processing"],
+            "pending": self.colors["fg"]
+        }
+        self.file_listbox.itemconfig(index, foreground=colors.get(status, self.colors["fg"]))
 
         if status == "processing":
             self.file_listbox.see(index)
