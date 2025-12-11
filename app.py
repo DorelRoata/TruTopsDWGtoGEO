@@ -58,8 +58,11 @@ class Config:
 
     def save(self):
         """Save configuration to file."""
+        full_path = os.path.abspath(CONFIG_FILE)
+        print("[CONFIG] Saving to: {}".format(full_path))
         with open(CONFIG_FILE, 'w') as f:
             json.dump(self.data, f, indent=2)
+        print("[CONFIG] Saved! click_locations: {}".format(self.data.get("click_locations")))
 
     def _deep_update(self, base, update):
         """Recursively update nested dictionaries."""
@@ -331,10 +334,12 @@ class LocationSetupDialog(tk.Toplevel):
 
         if click_pos[0]:
             x, y = click_pos[0]
+            print("[CAPTURE] Got click at ({}, {}) for {}".format(x, y, location_key))
             self.config.set("click_locations", location_key, [x, y])
             self.captured[location_key] = True
             self.after(0, lambda: self._capture_complete(location_key, x, y))
         else:
+            print("[CAPTURE] No click detected for {}".format(location_key))
             self.after(0, lambda: self._capture_complete(location_key, None, None))
 
     def _capture_complete(self, location_key, x, y):
