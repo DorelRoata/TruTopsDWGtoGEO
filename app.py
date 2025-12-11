@@ -27,7 +27,6 @@ DEFAULT_CONFIG = {
     "trutops_window_title": "TruTops",  # Window title to focus
     "click_locations": {
         "no_save": [3009, 672],              # "No" button - don't save modifications
-        "file_list": [2690, 667],            # Click to focus file list in Open dialog
         "save_selected": [680, 126],         # Save Selected to GEO button
         "select_top_left": [75, 209],        # Top-left corner of selection box
         "select_bottom_right": [3350, 1867], # Bottom-right corner of selection box
@@ -220,7 +219,6 @@ class LocationSetupDialog(tk.Toplevel):
 
         self.locations = {
             "no_save": ("No Button", "Click 'No' when asked to save modifications"),
-            "file_list": ("File List", "Click to focus file list in Open dialog"),
             "save_selected": ("Save Selected", "Click 'Save Selected to GEO' button"),
             "select_top_left": ("Selection Top-Left", "Click TOP-LEFT corner of part"),
             "select_bottom_right": ("Selection Bottom-Right", "Click BOTTOM-RIGHT corner"),
@@ -480,6 +478,13 @@ class AutomationRunner:
             print("[IMAGE] Could not find '{}'".format(description))
             return False
 
+    def _copy_to_clipboard(self, text):
+        """Copy text to clipboard."""
+        import subprocess
+        # Use clip.exe on Windows
+        process = subprocess.Popen(['clip'], stdin=subprocess.PIPE)
+        process.communicate(text.encode('utf-8'))
+
     def _run(self):
         """Main automation loop."""
         import_delay = self.config.get("import_delay") or 3.0
@@ -487,7 +492,6 @@ class AutomationRunner:
 
         # Get all click locations
         no_save_pos = self.config.get("click_locations", "no_save")
-        file_list_pos = self.config.get("click_locations", "file_list")
         save_selected_pos = self.config.get("click_locations", "save_selected")
         select_tl_pos = self.config.get("click_locations", "select_top_left")
         select_br_pos = self.config.get("click_locations", "select_bottom_right")
@@ -506,19 +510,20 @@ class AutomationRunner:
             if not self.running or self.escape_pressed:
                 break
 
-            file = self.files[i]
+            file_path = self.files[i]
+            file_name = os.path.basename(file_path)  # Just the filename with extension
             self.current_index = i
             self.config.set("last_processed_index", i)
 
             # Update UI
             self.app.after(0, lambda i=i: self.app.update_file_status(i, "processing"))
-            self.app.after(0, lambda f=file, i=i, t=total: self.app.update_status(
+            self.app.after(0, lambda f=file_name, i=i, t=total: self.app.update_status(
                 "Processing {} ({}/{}) - ESC to abort".format(f, i + 1, t)
             ))
             self.app.after(0, lambda i=i, t=total: self.app.update_progress(i, t))
 
             try:
-                print("\n--- File {}/{}: {} ---".format(i + 1, total, file))
+                print("\n--- File {}/{}: {} ---".format(i + 1, total, file_name))
 
                 # Step 1: Open Drawing (Ctrl+O)
                 self._hotkey('ctrl', 'o', description="Open Drawing shortcut")
@@ -532,47 +537,45 @@ class AutomationRunner:
                     self._click(no_save_pos[0], no_save_pos[1], "No (don't save)")
                     time.sleep(0.5)
 
-                # Step 3: Click file list to focus
-                if file_list_pos:
-                    self._click(file_list_pos[0], file_list_pos[1], "Focus file list")
-                    time.sleep(0.3)
+                # Step 3: Copy filename to clipboard and paste it
+                # The filename box is already selected after clicking No
+                self._copy_to_clipboard(file_path)
+                print("[CLIPBOARD] Copied: {}".format(file_path))
 
-                # Step 4: Move to next file (skip for first file)
-                if i > 0:
-                    self._press('down', "Next file")
-                    time.sleep(0.2)
+                self._hotkey('ctrl', 'v', description="Paste filename")
+                time.sleep(0.3)
 
-                # Step 5: Open drawing
+                # Step 4: Open drawing
                 self._press('enter', "Open drawing")
                 time.sleep(1.0)
 
-                # Step 6: Confirm import settings
+                # Step 5: Confirm import settings
                 self._press('enter', "Confirm import settings")
                 time.sleep(import_delay)
 
                 if not self.running:
                     break
 
-                # Step 7: Click Save Selected to GEO
+                # Step 6: Click Save Selected to GEO
                 if save_selected_pos:
                     self._click(save_selected_pos[0], save_selected_pos[1], "Save Selected to GEO")
                     time.sleep(0.5)
 
-                # Step 8: Click top-left corner of selection box
+                # Step 7: Click top-left corner of selection box
                 if select_tl_pos:
                     self._click(select_tl_pos[0], select_tl_pos[1], "Selection top-left")
                     time.sleep(0.3)
 
-                # Step 9: Click bottom-right corner of selection box
+                # Step 8: Click bottom-right corner of selection box
                 if select_br_pos:
                     self._click(select_br_pos[0], select_br_pos[1], "Selection bottom-right")
                     time.sleep(0.5)
 
-                # Step 10: Enter for warning dialog (may not appear, but safe to press)
+                # Step 9: Enter for warning dialog (may not appear, but safe to press)
                 self._press('enter', "Warning dialog (if any)")
                 time.sleep(0.3)
 
-                # Step 11: Enter to save file
+                # Step 10: Enter to save file
                 self._press('enter', "Save file")
                 time.sleep(save_delay)
 
@@ -703,9 +706,9 @@ class App(tk.Tk):
 
         ttk.Label(
             info_frame,
-            text="1. Ctrl+O  2. No  3. File list  4. Down  5. Enter (open)\n"
-                 "6. Enter (import)  7. Save Selected  8. TL  9. BR\n"
-                 "10. Enter (warning)  11. Enter (save)",
+            text="1. Ctrl+O  2. No  3. Paste filename  4. Enter (open)\n"
+                 "5. Enter (import)  6. Save Selected  7. TL  8. BR\n"
+                 "9. Enter (warning)  10. Enter (save)",
             font=("Consolas", 9), foreground="gray"
         ).pack(anchor="w")
 
@@ -746,7 +749,7 @@ class App(tk.Tk):
             return
 
         # Check locations
-        required = ["no_save", "file_list", "save_selected", "select_top_left", "select_bottom_right"]
+        required = ["no_save", "save_selected", "select_top_left", "select_bottom_right"]
         missing = [loc for loc in required if not self.config.get("click_locations", loc)]
 
         if missing:
