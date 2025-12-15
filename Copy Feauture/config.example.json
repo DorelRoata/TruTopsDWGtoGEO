@@ -1,0 +1,9 @@
+{
+  "FileNameColumn": 1,
+  "QuantityColumn": 3,
+  "MaterialColumn": 5,
+  "HandednessColumn": 7,
+  "OverwriteExisting": true,
+  "SourceDirectory": "",
+  "TargetDirectory": ""
+}
