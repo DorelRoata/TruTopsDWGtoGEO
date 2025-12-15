@@ -1,0 +1,13 @@
+{
+  "DocumentNameColumn": 2,
+  "MaterialColumn": 12,
+  "QuantityColumn": 6,
+  "HeaderRows": 2,
+  "BomFileExtension": ".SLDPRT",
+  "FilenameSuffix": "FLO",
+  "TargetFileExtension": ".dwg",
+  "OverwriteExisting": true,
+  "SourceDirectory": "Z:\\CAD_Files\\Customer Files\\Western Smokehouse Partners\\4711 - High-Speed Cutter\\DETAILS - ALL",
+  "TargetDirectory": "C:\\Users\\buzzm\\Documents\\CAD_TEST\\COPYTEST",
+  "LastBomFile": "D:\\Coding\\TruTopsDWGtoGEO\\Copy Feauture\\4711-100-FOR DOREL.xlsx"
+}

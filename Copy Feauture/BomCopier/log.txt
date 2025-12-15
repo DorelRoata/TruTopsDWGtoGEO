@@ -1,0 +1,50 @@
+[2025-12-15 07:22:21] Loaded 504 rows from BOM: D:\Coding\TruTopsDWGtoGEO\Copy Feauture\4711-100-FOR DOREL.xlsx
+[2025-12-15 07:22:56] Indexed 52 files in source directory
+[2025-12-15 07:22:56] File matching complete: 0 found, 504 not found
+[2025-12-15 07:37:18] Loaded 504 rows from BOM: D:\Coding\TruTopsDWGtoGEO\Copy Feauture\4711-100-FOR DOREL.xlsx
+[2025-12-15 07:45:13] Loaded 504 rows from BOM: D:\Coding\TruTopsDWGtoGEO\Copy Feauture\4711-100-FOR DOREL.xlsx
+[2025-12-15 07:50:28] Loaded 504 rows from BOM: D:\Coding\TruTopsDWGtoGEO\Copy Feauture\4711-100-FOR DOREL.xlsx
+[2025-12-15 07:56:16] Loaded 504 rows from BOM: D:\Coding\TruTopsDWGtoGEO\Copy Feauture\4711-100-FOR DOREL.xlsx
+[2025-12-15 08:01:33] Loaded 504 rows from BOM: D:\Coding\TruTopsDWGtoGEO\Copy Feauture\4711-100-FOR DOREL.xlsx
+[2025-12-15 08:12:05] Loaded 504 rows from BOM: D:\Coding\TruTopsDWGtoGEO\Copy Feauture\4711-100-FOR DOREL.xlsx
+[2025-12-15 08:12:34] Indexed 397 files in source directory
+[2025-12-15 08:12:34] File matching complete: 252 normal, 67 FLO suffix, 252 not found (total entries: 571)
+[2025-12-15 08:31:22] Loaded 504 rows from BOM: D:\Coding\TruTopsDWGtoGEO\Copy Feauture\4711-100-FOR DOREL.xlsx
+[2025-12-15 08:31:22] Indexed 397 files in source directory
+[2025-12-15 08:31:22] File matching complete: 252 normal, 67 FLO suffix, 252 not found (total entries: 571)
+[2025-12-15 08:50:19] Loaded 504 rows from BOM: D:\Coding\TruTopsDWGtoGEO\Copy Feauture\4711-100-FOR DOREL.xlsx
+[2025-12-15 08:50:19] Indexed 397 files in source directory
+[2025-12-15 08:50:19] File matching complete: 252 normal, 67 FLO suffix, 252 not found (total entries: 571)
+[2025-12-15 08:54:01] ========================================
+[2025-12-15 08:54:01] Copy session started
+[2025-12-15 08:54:01] Source: Z:\CAD_Files\Customer Files\Western Smokehouse Partners\4711 - High-Speed Cutter\DETAILS - ALL\4711-103FLO.DWG
+[2025-12-15 08:54:01] Target: C:\Users\buzzm\Documents\CAD_TEST\COPYTEST
+[2025-12-15 08:54:01] Files to copy: 24
+[2025-12-15 08:54:01] ========================================
+[2025-12-15 08:54:02] COPIED: 4711-103FLO.dwg
+[2025-12-15 08:54:02] COPIED: 4711-107.dwg
+[2025-12-15 08:54:02] COPIED: 4711-109FLO.dwg
+[2025-12-15 08:54:02] COPIED: 4711-110FLO.dwg
+[2025-12-15 08:54:02] COPIED: 4711-112.dwg
+[2025-12-15 08:54:02] COPIED: 4711-1123.dwg
+[2025-12-15 08:54:03] COPIED: 4711-116FLO.dwg
+[2025-12-15 08:54:03] COPIED: 4711-132.dwg
+[2025-12-15 08:54:03] COPIED: 4711-143.dwg
+[2025-12-15 08:54:03] COPIED: 4711-146FLO.dwg
+[2025-12-15 08:54:03] COPIED: 4711-148.dwg
+[2025-12-15 08:54:03] COPIED: 4711-152FLO.dwg
+[2025-12-15 08:54:03] COPIED: 4711-164.dwg
+[2025-12-15 08:54:04] COPIED: 4711-187.dwg
+[2025-12-15 08:54:04] COPIED: 4711-220.dwg
+[2025-12-15 08:54:04] COPIED: 4711-407FLO.dwg
+[2025-12-15 08:54:04] COPIED: 4711-414FLO.dwg
+[2025-12-15 08:54:04] COPIED: 4711-420.dwg
+[2025-12-15 08:54:04] COPIED: 4711-422FLO.dwg
+[2025-12-15 08:54:04] COPIED: 4711-423FLO.dwg
+[2025-12-15 08:54:04] COPIED: 4711-428.dwg
+[2025-12-15 08:54:05] COPIED: 4711-601.dwg
+[2025-12-15 08:54:05] COPIED: 4711-JIG-0.1875.dwg
+[2025-12-15 08:54:05] COPIED: 4711-606FLO.dwg
+[2025-12-15 08:54:05] ========================================
+[2025-12-15 08:54:05] Session complete: 24 copied, 0 skipped, 0 errors
+[2025-12-15 08:54:05] ========================================
