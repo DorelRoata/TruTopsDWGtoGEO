@@ -527,9 +527,9 @@ namespace BomCopier.Forms
             btnStartCopy.FlatStyle = FlatStyle.Flat;
             btnStartCopy.Font = new Font("Iosevka", 10F, FontStyle.Bold);
             btnStartCopy.ForeColor = Color.FromArgb(200, 230, 210);
-            btnStartCopy.Location = new Point(820, 35);
+            btnStartCopy.Location = new Point(820, 38);
             btnStartCopy.Name = "btnStartCopy";
-            btnStartCopy.Size = new Size(115, 38);
+            btnStartCopy.Size = new Size(115, 28);
             btnStartCopy.TabIndex = 2;
             btnStartCopy.Text = "Start Copy";
             btnStartCopy.UseVisualStyleBackColor = false;

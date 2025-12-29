@@ -144,6 +144,9 @@ namespace BomCopier.Forms
             // Exclude already queued items
             displayList = displayList.Where(r => !_queuedFiles.Contains(r)).ToList();
 
+            // Save scroll position
+            int topIndex = lstAvailable.TopItem?.Index ?? 0;
+
             lstAvailable.BeginUpdate();
             lstAvailable.Items.Clear();
             foreach (var row in displayList)
@@ -156,6 +159,13 @@ namespace BomCopier.Forms
                 lstAvailable.Items.Add(item);
             }
             lstAvailable.EndUpdate();
+
+            // Restore scroll position
+            if (lstAvailable.Items.Count > 0 && topIndex > 0)
+            {
+                int newTopIndex = Math.Min(topIndex, lstAvailable.Items.Count - 1);
+                lstAvailable.TopItem = lstAvailable.Items[newTopIndex];
+            }
 
             lblFileCount.Text = $"{displayList.Count} available, {_queuedFiles.Count} queued";
         }
@@ -170,6 +180,9 @@ namespace BomCopier.Forms
                     r.TargetFileName.ToLower().Contains(search)).ToList();
             }
 
+            // Save scroll position
+            int topIndex = lstQueue.TopItem?.Index ?? 0;
+
             lstQueue.BeginUpdate();
             lstQueue.Items.Clear();
             foreach (var row in displayList)
@@ -182,6 +195,13 @@ namespace BomCopier.Forms
                 lstQueue.Items.Add(item);
             }
             lstQueue.EndUpdate();
+
+            // Restore scroll position
+            if (lstQueue.Items.Count > 0 && topIndex > 0)
+            {
+                int newTopIndex = Math.Min(topIndex, lstQueue.Items.Count - 1);
+                lstQueue.TopItem = lstQueue.Items[newTopIndex];
+            }
 
             lblFileCount.Text = $"{lstAvailable.Items.Count} available, {_queuedFiles.Count} queued";
             btnStartCopy.Enabled = _queuedFiles.Count > 0;
