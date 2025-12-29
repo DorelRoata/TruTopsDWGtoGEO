@@ -43,6 +43,7 @@ namespace BomCopier.Forms
             btnAdd = new Button();
             btnRemove = new Button();
             btnClearQueue = new Button();
+            btnFloOnly = new Button();
             pnlQueue = new Panel();
             lstQueue = new ListView();
             colQueueName = new ColumnHeader();
@@ -340,6 +341,7 @@ namespace BomCopier.Forms
             pnlButtons.Controls.Add(btnAdd);
             pnlButtons.Controls.Add(btnRemove);
             pnlButtons.Controls.Add(btnClearQueue);
+            pnlButtons.Controls.Add(btnFloOnly);
             pnlButtons.Dock = DockStyle.Left;
             pnlButtons.Location = new Point(408, 8);
             pnlButtons.Name = "pnlButtons";
@@ -413,6 +415,23 @@ namespace BomCopier.Forms
             btnClearQueue.Text = "Clear";
             btnClearQueue.UseVisualStyleBackColor = false;
             btnClearQueue.Click += btnClearQueue_Click;
+            //
+            // btnFloOnly
+            //
+            btnFloOnly.BackColor = Color.FromArgb(90, 70, 120);
+            btnFloOnly.Cursor = Cursors.Hand;
+            btnFloOnly.FlatAppearance.BorderColor = Color.FromArgb(110, 90, 140);
+            btnFloOnly.FlatAppearance.MouseOverBackColor = Color.FromArgb(100, 80, 130);
+            btnFloOnly.FlatStyle = FlatStyle.Flat;
+            btnFloOnly.Font = new Font("Iosevka", 8F);
+            btnFloOnly.ForeColor = Color.FromArgb(220, 210, 240);
+            btnFloOnly.Location = new Point(10, 284);
+            btnFloOnly.Name = "btnFloOnly";
+            btnFloOnly.Size = new Size(70, 28);
+            btnFloOnly.TabIndex = 4;
+            btnFloOnly.Text = "FLO Only";
+            btnFloOnly.UseVisualStyleBackColor = false;
+            btnFloOnly.Click += btnFloOnly_Click;
             //
             // pnlQueue - Right panel with glass effect
             //
@@ -595,6 +614,7 @@ namespace BomCopier.Forms
         private Button btnAddAll;
         private Button btnRemove;
         private Button btnClearQueue;
+        private Button btnFloOnly;
         private Panel pnlQueue;
         private Label lblQueue;
         private TextBox txtSearchQueue;

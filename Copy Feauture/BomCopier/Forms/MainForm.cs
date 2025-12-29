@@ -238,6 +238,40 @@ namespace BomCopier.Forms
             RefreshQueueList();
         }
 
+        private void FilterFloOnly()
+        {
+            if (_queuedFiles.Count == 0)
+                return;
+
+            // Get suffix from config (default "FLO")
+            string suffix = _config.FilenameSuffix;
+
+            // Find all base names that have a FLO version in the queue
+            var floFiles = _queuedFiles
+                .Where(r => r.IsSuffixVersion)
+                .ToList();
+
+            // Get the base names of FLO files (without the suffix)
+            var floBaseNames = floFiles
+                .Select(r => r.NormalFileName.ToLowerInvariant())
+                .ToHashSet();
+
+            // Remove non-FLO files that have a matching FLO version
+            var toRemove = _queuedFiles
+                .Where(r => !r.IsSuffixVersion && floBaseNames.Contains(r.TargetFileName.ToLowerInvariant()))
+                .ToList();
+
+            foreach (var row in toRemove)
+            {
+                _queuedFiles.Remove(row);
+            }
+
+            RefreshAvailableList();
+            RefreshQueueList();
+
+            lblStatus.Text = $"Removed {toRemove.Count} non-FLO files (FLO versions exist)";
+        }
+
         private async void StartCopy()
         {
             if (_queuedFiles.Count == 0)
@@ -346,6 +380,7 @@ namespace BomCopier.Forms
             btnAddAll.Enabled = enabled;
             btnRemove.Enabled = enabled;
             btnClearQueue.Enabled = enabled;
+            btnFloOnly.Enabled = enabled;
             btnStartCopy.Enabled = enabled && _queuedFiles.Count > 0;
             cmbMaterial.Enabled = enabled;
             lstAvailable.Enabled = enabled;
@@ -452,6 +487,11 @@ namespace BomCopier.Forms
         private void btnClearQueue_Click(object sender, EventArgs e)
         {
             ClearQueue();
+        }
+
+        private void btnFloOnly_Click(object sender, EventArgs e)
+        {
+            FilterFloOnly();
         }
 
         private void btnStartCopy_Click(object sender, EventArgs e)
