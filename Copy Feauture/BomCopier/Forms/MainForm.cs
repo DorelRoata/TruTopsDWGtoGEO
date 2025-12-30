@@ -19,6 +19,13 @@ namespace BomCopier.Forms
         {
             InitializeComponent();
 
+            // Set form icon
+            string iconPath = Path.Combine(AppContext.BaseDirectory, "bc_icon.ico");
+            if (File.Exists(iconPath))
+            {
+                this.Icon = new Icon(iconPath);
+            }
+
             _configService = new ConfigService();
             _excelService = new ExcelService();
             _fileSearchService = new FileSearchService();
