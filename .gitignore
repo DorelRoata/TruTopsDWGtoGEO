@@ -6,7 +6,6 @@
 # Dotnet
 **/bin/
 **/obj/
-**/publish/
 *.user
 *.suo
 
