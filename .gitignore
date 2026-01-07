@@ -1,0 +1,16 @@
+# IDEs
+.claude/
+.vscode/
+.idea/
+
+# Dotnet
+**/bin/
+**/obj/
+**/publish/
+*.user
+*.suo
+
+# System
+thumbs.db
+desktop.ini
+nul
