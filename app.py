@@ -560,6 +560,8 @@ class AutomationRunner:
         self.escape_pressed = False
         self.keyboard_listener = None
         self.manual_trigger = False
+        self.dry_run = False
+        self.step_by_step = False
 
     def start(self, files, mode="auto", delay=3.0, manual_hotkey="f1"):
         """Start processing files."""
