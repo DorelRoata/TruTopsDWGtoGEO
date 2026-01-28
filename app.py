@@ -941,8 +941,8 @@ class App(tk.Tk):
         super().__init__()
 
         self.title("TruTops DWG to GEO Converter")
-        self.geometry("800x700")
-        self.minsize(800, 700)
+        self.geometry("800x850")
+        self.minsize(800, 850)
 
         # Slate satin theme colors
         self.colors = {
