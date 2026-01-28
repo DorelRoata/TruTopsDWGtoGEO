@@ -962,6 +962,218 @@ class App(tk.Tk):
         self.style.configure("TLabelframe", background=self.colors["bg_light"], foreground=self.colors["fg"])
         self.style.configure("TLabelframe.Label", background=self.colors["bg"], foreground=self.colors["fg"])
         self.style.configure("TButton", background=self.colors["accent"], foreground=self.colors["fg"], padding=6)
+
+        self.config = Config()
+        self.image_viewer = ImagePreviewWindow(self)
+        self.automation = AutomationRunner(self)
+        self.files = []
+        self.file_status = {}
+
+        self._create_widgets()
+
+    def _create_widgets(self):
+        """Create main window widgets."""
+        # Header
+        header_frame = tk.Frame(self, bg=self.colors["bg"], pady=15)
+        header_frame.pack(fill="x")
+        
+        tk.Label(
+            header_frame, 
+            text="TruTops DWG to GEO", 
+            font=("Segoe UI", 18, "bold"),
+            bg=self.colors["bg"], fg=self.colors["fg"]
+        ).pack()
+
+        # Mode Selection
+        mode_frame = tk.LabelFrame(
+            self, text="Automation Mode", 
+            font=("Segoe UI", 10, "bold"),
+            bg=self.colors["bg_light"], fg=self.colors["fg"],
+            padx=15, pady=10
+        )
+        mode_frame.pack(fill="x", padx=15, pady=5)
+        
+        self.mode_var = tk.StringVar(value=self.config.get("mode") or "auto")
+        
+        # Auto Mode
+        auto_frame = tk.Frame(mode_frame, bg=self.colors["bg_light"])
+        auto_frame.pack(fill="x", pady=2)
+        
+        tk.Radiobutton(
+            auto_frame, text="Auto Mode", variable=self.mode_var, value="auto",
+            bg=self.colors["bg_light"], fg=self.colors["fg"],
+            selectcolor=self.colors["bg_light"],
+            activebackground=self.colors["bg_light"], activeforeground=self.colors["highlight"],
+            command=self._on_mode_change
+        ).pack(side="left")
+        
+        tk.Label(
+            auto_frame, text="Delay (sec):", 
+            bg=self.colors["bg_light"], fg=self.colors["fg"]
+        ).pack(side="left", padx=(15, 5))
+        
+        self.delay_var = tk.DoubleVar(value=self.config.get("auto_delay") or 3.0)
+        self.delay_spin = tk.Spinbox(
+            auto_frame, from_=0.5, to=60.0, increment=0.5,
+            textvariable=self.delay_var, width=5
+        )
+        self.delay_spin.pack(side="left")
+
+        # Manual Mode
+        manual_frame = tk.Frame(mode_frame, bg=self.colors["bg_light"])
+        manual_frame.pack(fill="x", pady=2)
+        
+        tk.Radiobutton(
+            manual_frame, text="Manual Mode", variable=self.mode_var, value="manual",
+            bg=self.colors["bg_light"], fg=self.colors["fg"],
+            selectcolor=self.colors["bg_light"],
+            activebackground=self.colors["bg_light"], activeforeground=self.colors["highlight"],
+            command=self._on_mode_change
+        ).pack(side="left")
+        
+        hk = self.config.get("manual_hotkey") or "F1"
+        tk.Label(
+            manual_frame, text=f"(Press '{hk.upper()}' to continue)", 
+            bg=self.colors["bg_light"], fg=self.colors["accent"],
+            font=("Segoe UI", 9, "italic")
+        ).pack(side="left", padx=10)
+
+        # File List
+        list_frame = ttk.LabelFrame(self, text="File Queue", padding=10)
+        list_frame.pack(fill="both", expand=True, padx=15, pady=10)
+
+        # Toolbar
+        toolbar = ttk.Frame(list_frame)
+        toolbar.pack(fill="x", pady=(0, 5))
+
+        ttk.Button(toolbar, text="+ Select Folder", command=self._add_files).pack(side="left")
+        ttk.Button(toolbar, text="Clear List", command=self._clear_files).pack(side="left", padx=5)
+        
+        self.file_count_label = ttk.Label(toolbar, text="0 files")
+        self.file_count_label.pack(side="right")
+
+        # Listbox with Scrollbar
+        list_scroll_frame = ttk.Frame(list_frame)
+        list_scroll_frame.pack(fill="both", expand=True)
+
+        scrollbar = ttk.Scrollbar(list_scroll_frame)
+        scrollbar.pack(side="right", fill="y")
+
+        self.file_listbox = tk.Listbox(
+            list_scroll_frame,
+            yscrollcommand=scrollbar.set,
+            bg=self.colors["bg_light"],
+            fg=self.colors["fg"],
+            selectbackground=self.colors["highlight"],
+            selectforeground="#000000",
+            highlightthickness=0,
+            bd=0
+        )
+        self.file_listbox.pack(side="left", fill="both", expand=True)
+        scrollbar.config(command=self.file_listbox.yview)
+
+        # Status
+        status_frame = ttk.Frame(self)
+        status_frame.pack(fill="x", padx=15, pady=8)
+
+        self.status_label = ttk.Label(status_frame, text="Ready - Select project folder")
+        self.status_label.pack(anchor="w")
+
+        self.progress_var = tk.DoubleVar(value=0)
+        self.progress_bar = ttk.Progressbar(
+            status_frame, variable=self.progress_var, maximum=100
+        )
+        self.progress_bar.pack(fill="x", pady=8)
+
+        self.progress_label = ttk.Label(status_frame, text="0/0")
+        self.progress_label.pack(anchor="e")
+
+        # Control buttons
+        btn_frame = ttk.Frame(self)
+        btn_frame.pack(fill="x", padx=15, pady=10)
+
+        self.start_btn = ttk.Button(btn_frame, text="START AUTOMATION", command=self._start)
+        self.start_btn.pack(side="left", padx=(0, 8))
+
+        self.stop_btn = ttk.Button(btn_frame, text="STOP", command=self._stop, state="disabled")
+        self.stop_btn.pack(side="left", padx=(0, 8))
+
+        ttk.Button(btn_frame, text="Show Preview Window", command=self.image_viewer.deiconify).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Settings", command=self._setup_locations).pack(side="right")
+
+    def _on_mode_change(self):
+        """Save mode change."""
+        self.config.set("mode", self.mode_var.get())
+
+    def _add_files(self):
+        """Select project folder and find files."""
+        folder = filedialog.askdirectory(title="Select Project Root (containing Filtered_DWGs)")
+        if not folder:
+            return
+
+        dwg_dir = os.path.join(folder, "Filtered_DWGs")
+        img_dir = os.path.join(folder, "DWG_Images")
+
+        if not os.path.exists(dwg_dir):
+            if messagebox.askyesno("Structure Mismatch", 
+                "Could not find 'Filtered_DWGs' folder.\n\nUse selected folder directly?"):
+                dwg_dir = folder
+                img_dir = folder # Assume images in same folder or flat structure
+            else:
+                return
+
+        new_files = []
+        try:
+            # os.listdir is faster than glob for simple extension check
+            for f in os.listdir(dwg_dir):
+                if f.lower().endswith(".dwg"):
+                    full_path = os.path.join(dwg_dir, f)
+                    
+                    # Look for corresponding image
+                    name_base = os.path.splitext(f)[0]
+                    img_path = None
+                    
+                    # Try common image extensions
+                    for ext in [".png", ".jpg", ".jpeg"]:
+                        candidate = os.path.join(img_dir, name_base + ext)
+                        if os.path.exists(candidate):
+                            img_path = candidate
+                            break
+                    
+                    # Store tuple: (dwg_path, image_path)
+                    new_files.append({"dwg": full_path, "image": img_path})
+            
+            if not new_files:
+                messagebox.showwarning("No Files", "No DWG files found in:\n" + dwg_dir)
+                return
+                
+            self.files = new_files
+            self._update_file_list()
+            self.image_viewer.deiconify() # Show viewer so they can position it
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error scanning folder: {e}")
+
+    def _clear_files(self):
+        """Clear file list."""
+        self.files = []
+        self.file_status = {}
+        self.image_viewer.clear()
+        self._update_file_list()
+
+    def _update_file_list(self):
+        """Update the file listbox."""
+        self.file_listbox.delete(0, tk.END)
+        for i, item in enumerate(self.files):
+            name = os.path.basename(item["dwg"])
+            has_img = " [IMG]" if item["image"] else ""
+            self.file_listbox.insert(tk.END, f"  {name}{has_img}")
+            self.file_status[i] = "pending"
+
+        self.file_count_label.config(text="{} files".format(len(self.files)))
+        self.update_progress(0, len(self.files) or 1)
+
+    def _start(self):
         """Start automation."""
         if not self.files:
             messagebox.showwarning("No Files", "Add DWG files first.")
