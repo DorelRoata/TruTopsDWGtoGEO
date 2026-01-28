@@ -13,6 +13,14 @@ import threading
 import time
 import copy
 from pathlib import Path
+import ctypes
+
+# Enable High DPI Awareness on Windows to fix blurry UI
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)
+except Exception:
+    pass
+
 
 import pyautogui
 from PIL import Image, ImageGrab, ImageDraw, ImageTk
@@ -67,6 +75,18 @@ class ImagePreviewWindow(tk.Toplevel):
             bg="black", fg="white", font=("Arial", 14)
         )
         self.status_label.place(relx=0.5, rely=0.5, anchor="center")
+        
+        self.raw_image = None
+        self.bind("<Configure>", self._on_resize)
+        self.resize_timer = None
+
+    def _on_resize(self, event):
+        """Handle window resize events."""
+        if self.raw_image:
+            # Debounce resize to avoid lag
+            if self.resize_timer:
+                self.after_cancel(self.resize_timer)
+            self.resize_timer = self.after(100, self._refresh_image)
 
     def show_image(self, image_path):
         """Load and scale image to fit window."""
@@ -79,39 +99,48 @@ class ImagePreviewWindow(tk.Toplevel):
             return
 
         try:
-            # Load and resize
-            img = Image.open(image_path)
-            
-            # Get window size
-            win_width = self.winfo_width()
-            win_height = self.winfo_height()
-            
-            if win_width < 100: win_width = 600
-            if win_height < 100: win_height = 600
-            
-            # Calculate input aspect ratio
-            img_ratio = img.width / img.height
-            win_ratio = win_width / win_height
-            
-            if img_ratio > win_ratio:
-                # limited by width
-                target_width = win_width
-                target_height = int(win_width / img_ratio)
-            else:
-                # limited by height
-                target_height = win_height
-                target_width = int(win_height * img_ratio)
-                
-            img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
-            
-            self.current_image = ImageTk.PhotoImage(img)
-            self.image_label.configure(image=self.current_image)
+            # Load and convert to RGB (Fixes over-exposed/CMYK issues)
+            self.raw_image = Image.open(image_path).convert('RGB')
+            self._refresh_image()
             self.status_label.place_forget()
             
         except Exception as e:
-            print(f"Error loading image: {e}")
-            self.status_label.config(text=f"Error loading image")
+            print("Image ID 10T Error: {}".format(e))
+            self.status_label.config(text="Error loading image")
             self.status_label.place(relx=0.5, rely=0.5, anchor="center")
+
+    def _refresh_image(self):
+        """Resize current raw image to fit window."""
+        if not self.raw_image:
+            return
+
+        # Get window size
+        win_width = self.winfo_width()
+        win_height = self.winfo_height()
+        
+        if win_width < 50 or win_height < 50: 
+            return
+        
+        # Calculate input aspect ratio
+        img_ratio = self.raw_image.width / self.raw_image.height
+        win_ratio = win_width / win_height
+        
+        if img_ratio > win_ratio:
+            # limited by width
+            target_width = win_width
+            target_height = int(win_width / img_ratio)
+        else:
+            # limited by height
+            target_height = win_height
+            target_width = int(win_height * img_ratio)
+            
+        # Use High Quality Downsampling
+        img = self.raw_image.resize((target_width, target_height), Image.Resampling.LANCZOS)
+        
+        self.current_image = ImageTk.PhotoImage(img)
+        self.image_label.configure(image=self.current_image)
+            
+
 
     def clear(self):
         """Clear the current image."""
