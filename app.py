@@ -927,12 +927,12 @@ class AutomationRunner:
                     self._click(no_save_pos[0], no_save_pos[1], "No (don't save)")
                     time.sleep(0.5)
 
-                # Step 3: Copy full file path to clipboard and paste it
+                # Step 3: Copy filename to clipboard and paste it
                 # The filename box is already selected after clicking No
-                # IMPORTANT: Use full path to ensure we open the file from Filtered_DWGs
-                self.app.after(0, lambda: self.overlay.show("Pasting File Path...", self.mode))
-                self._copy_to_clipboard(file_path) 
-                print("[CLIPBOARD] Copied: {}".format(file_path))
+                # User must ensure TruTops is in the correct folder (Filtered_DWGs)
+                self.app.after(0, lambda: self.overlay.show("Pasting Filename...", self.mode))
+                self._copy_to_clipboard(file_name) 
+                print("[CLIPBOARD] Copied: {}".format(file_name))
 
                 self._hotkey('ctrl', 'v', description="Paste file path")
                 time.sleep(0.3)
