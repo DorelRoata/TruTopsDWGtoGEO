@@ -29,7 +29,7 @@ DEFAULT_CONFIG = {
     "trutops_window_title": "TruTops",  # Window title to focus
     "mode": "auto",                     # auto or manual
     "auto_delay": 3,                    # Seconds to wait in auto mode
-    "manual_hotkey": "f1",              # Hotkey for manual trigger
+    "manual_hotkey": "f2",              # Hotkey for manual trigger
     "click_locations": {
         "open_drawing": [549, 114],          # Open Drawing button (not Ctrl+O)
         "no_save": [3009, 672],              # "No" button - don't save modifications
@@ -1109,20 +1109,31 @@ class App(tk.Tk):
 
     def _add_files(self):
         """Select project folder and find files."""
-        folder = filedialog.askdirectory(title="Select Project Root (containing Filtered_DWGs)")
+        folder = filedialog.askdirectory(title="Select Folder (Project Root or Filtered_DWGs)")
         if not folder:
             return
 
-        dwg_dir = os.path.join(folder, "Filtered_DWGs")
-        img_dir = os.path.join(folder, "DWG_Images")
-
-        if not os.path.exists(dwg_dir):
-            if messagebox.askyesno("Structure Mismatch", 
-                "Could not find 'Filtered_DWGs' folder.\n\nUse selected folder directly?"):
-                dwg_dir = folder
-                img_dir = folder # Assume images in same folder or flat structure
+        # Determine logic based on selection
+        base_name = os.path.basename(folder)
+        
+        if base_name == "Filtered_DWGs":
+            # User selected the Filtered_DWGs folder directly
+            dwg_dir = folder
+            # Assume images are in sibling folder
+            img_dir = os.path.join(os.path.dirname(folder), "DWG_Images")
+        else:
+            # User likely selected project root
+            potential_dwg = os.path.join(folder, "Filtered_DWGs")
+            if os.path.exists(potential_dwg):
+                dwg_dir = potential_dwg
+                img_dir = os.path.join(folder, "DWG_Images")
             else:
-                return
+                # Fallback: Assume simple folder with dwgs
+                dwg_dir = folder
+                img_dir = folder  # Or maybe None? Let's check same folder for now
+
+        print(f"[FILE SCAN] DWG Dir: {dwg_dir}")
+        print(f"[FILE SCAN] IMG Dir: {img_dir}")
 
         new_files = []
         try:
@@ -1136,11 +1147,13 @@ class App(tk.Tk):
                     img_path = None
                     
                     # Try common image extensions
-                    for ext in [".png", ".jpg", ".jpeg"]:
-                        candidate = os.path.join(img_dir, name_base + ext)
-                        if os.path.exists(candidate):
-                            img_path = candidate
-                            break
+                    # Check img_dir first
+                    if os.path.exists(img_dir):
+                        for ext in [".png", ".jpg", ".jpeg"]:
+                            candidate = os.path.join(img_dir, name_base + ext)
+                            if os.path.exists(candidate):
+                                img_path = candidate
+                                break
                     
                     # Store tuple: (dwg_path, image_path)
                     new_files.append({"dwg": full_path, "image": img_path})
