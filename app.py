@@ -329,6 +329,60 @@ class ClickIndicator:
             print("Indicator error: {}".format(e))
 
 
+
+class StatusOverlay:
+    """Persistent overlay to show current automation status/step."""
+    
+    def __init__(self, root):
+        self.root = root
+        self.window = None
+        self.label = None
+        
+    def show(self, text, mode="AUTO"):
+        """Show or update the overlay."""
+        try:
+            if not self.window:
+                self.window = tk.Toplevel(self.root)
+                self.window.overrideredirect(True)
+                self.window.attributes('-topmost', True)
+                self.window.attributes('-alpha', 0.85) # Slight transparency
+                self.window.configure(bg='black')
+                
+                # Position bottom-left
+                screen_h = self.root.winfo_screenheight()
+                self.window.geometry("+30+{}".format(screen_h - 120))
+                
+                self.label = tk.Label(
+                    self.window, 
+                    text="", 
+                    font=("Consolas", 12, "bold"),
+                    bg='black', fg='#00ff00', # Hacker green
+                    padx=15, pady=8,
+                    relief="raised", borderwidth=1
+                )
+                self.label.pack()
+
+            # Format: [MODE] Step Description
+            display_text = "[{}] {}".format(mode.upper(), text)
+            self.label.config(text=display_text)
+            self.window.deiconify()
+            self.window.lift()
+            
+        except Exception as e:
+            print("Overlay error: {}".format(e))
+
+    def hide(self):
+        """Hide the overlay."""
+        if self.window:
+            self.window.withdraw()
+
+    def destroy(self):
+        """Clean up."""
+        if self.window:
+            self.window.destroy()
+            self.window = None
+
+
 class LocationSetupDialog(tk.Toplevel):
     """Dialog for capturing click locations."""
 
@@ -557,6 +611,7 @@ class AutomationRunner:
         self.running = False
         self.current_index = 0
         self.indicator = ClickIndicator(app)
+        self.overlay = StatusOverlay(app)
         self.escape_pressed = False
         self.keyboard_listener = None
         self.manual_trigger = False
@@ -594,6 +649,7 @@ class AutomationRunner:
         """Stop processing."""
         self.running = False
         self._stop_listeners()
+        self.app.after(0, self.overlay.hide)
         self.app.update_status("Stopped")
 
     def _start_listeners(self):
@@ -838,16 +894,20 @@ class AutomationRunner:
             ))
             self.app.after(0, lambda i=i, t=total: self.app.update_progress(i, t))
             
+            # OVERLAY UPDATE
+            self.app.after(0, lambda f=file_name: self.overlay.show(f"Processing: {f}", self.mode))
+            
             # SHOW IMAGE
             if img_path:
                 self.app.after(0, lambda p=img_path: self.app.image_viewer.show_image(p))
             else:
-                 self.app.after(0, self.app.image_viewer.clear)
+                self.app.after(0, self.app.image_viewer.clear)
 
             try:
                 print("\n--- File {}/{}: {} ---".format(i + 1, total, file_name))
 
                 # Step 1: Click Open Drawing button
+                self.app.after(0, lambda: self.overlay.show("Opening Drawing...", self.mode))
                 if open_drawing_pos:
                     self._click(open_drawing_pos[0], open_drawing_pos[1], "Open Drawing")
                     time.sleep(0.5)
@@ -863,6 +923,7 @@ class AutomationRunner:
                 # Step 3: Copy full file path to clipboard and paste it
                 # The filename box is already selected after clicking No
                 # IMPORTANT: Use full path to ensure we open the file from Filtered_DWGs
+                self.app.after(0, lambda: self.overlay.show("Pasting File Path...", self.mode))
                 self._copy_to_clipboard(file_path) 
                 print("[CLIPBOARD] Copied: {}".format(file_path))
 
@@ -882,6 +943,7 @@ class AutomationRunner:
                     
                 # === PAUSE POINT FOR MANUAL/AUTO MODE ===
                 # This is where the user checks the preview against TruTops
+                self.app.after(0, lambda: self.overlay.show("Waiting for Trigger...", self.mode))
                 if not self._wait_for_trigger():
                     break
 
@@ -891,6 +953,8 @@ class AutomationRunner:
                     time.sleep(0.5)
 
                 # Step 7: Click top-left corner of selection box
+                # Step 5: Select all elements (drag box)
+                self.app.after(0, lambda: self.overlay.show("Selecting Elements...", self.mode))
                 if select_tl_pos:
                     self._click(select_tl_pos[0], select_tl_pos[1], "Selection top-left")
                     time.sleep(0.3)
@@ -931,6 +995,7 @@ class AutomationRunner:
             self.app.after(0, lambda: messagebox.showinfo("Done", "Processed {} files!".format(total)))
 
         self.running = False
+        self.app.after(0, self.overlay.hide)
         self.app.after(0, self.app.on_automation_stopped)
 
 
