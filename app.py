@@ -58,7 +58,16 @@ class ImagePreviewWindow(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Part Preview")
-        self.geometry("600x600")
+        
+        # Center window on screen
+        win_width = 800
+        win_height = 800
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width - win_width) // 2
+        y = (screen_height - win_height) // 2
+        self.geometry(f"{win_width}x{win_height}+{x}+{y}")
+        
         self.configure(bg="black")
         
         # Make it persistent (don't destroy on close, just hide)
@@ -1416,9 +1425,16 @@ def main():
     """Main entry point."""
     os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 
-    print("=" * 50)
+    print(r"""
+  _____  __          __  _____    ___     _____   ______    ____  
+ |  __ \ \ \        / / / ____|  |__ \   / ____| |  ____|  / __ \ 
+ | |  | | \ \  /\  / / | |  __      ) | | |  __  | |__    | |  | |
+ | |  | |  \ \/  \/ /  | | |_ |    / /  | | |_ | |  __|   | |  | |
+ | |__| |   \  /\  /   | |__| |   / /_  | |__| | | |____  | |__| |
+ |_____/     \/  \/     \_____|  |____|  \_____| |______|  \____/ 
+    """)
     print("TruTops DWG to GEO Converter")
-    print("=" * 50)
+    print("=" * 60)
     print("Screen size: {}".format(pyautogui.size()))
     print("")
 
