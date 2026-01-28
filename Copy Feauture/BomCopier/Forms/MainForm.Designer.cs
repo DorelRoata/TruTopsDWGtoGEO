@@ -286,12 +286,13 @@ namespace BomCopier.Forms
             lstAvailable.ForeColor = Color.FromArgb(200, 210, 220);
             lstAvailable.FullRowSelect = true;
             lstAvailable.Location = new Point(12, 62);
+            lstAvailable.MultiSelect = true;
             lstAvailable.Name = "lstAvailable";
             lstAvailable.Size = new Size(376, 300);
             lstAvailable.TabIndex = 2;
             lstAvailable.UseCompatibleStateImageBehavior = false;
             lstAvailable.View = View.Details;
-            lstAvailable.Click += lstAvailable_Click;
+            lstAvailable.DoubleClick += lstAvailable_DoubleClick;
             lstAvailable.KeyDown += lstAvailable_KeyDown;
             //
             // colAvailableName
@@ -455,12 +456,13 @@ namespace BomCopier.Forms
             lstQueue.ForeColor = Color.FromArgb(200, 210, 220);
             lstQueue.FullRowSelect = true;
             lstQueue.Location = new Point(12, 62);
+            lstQueue.MultiSelect = true;
             lstQueue.Name = "lstQueue";
             lstQueue.Size = new Size(420, 300);
             lstQueue.TabIndex = 2;
             lstQueue.UseCompatibleStateImageBehavior = false;
             lstQueue.View = View.Details;
-            lstQueue.Click += lstQueue_Click;
+            lstQueue.DoubleClick += lstQueue_DoubleClick;
             lstQueue.KeyDown += lstQueue_KeyDown;
             //
             // colQueueName
@@ -544,7 +546,7 @@ namespace BomCopier.Forms
             lblStatus.Name = "lblStatus";
             lblStatus.Size = new Size(800, 20);
             lblStatus.TabIndex = 1;
-            lblStatus.Text = "Ready - Load a BOM file to begin";
+            lblStatus.Text = "Ready - Load a BOM or select a source folder";
             //
             // progressBar
             //

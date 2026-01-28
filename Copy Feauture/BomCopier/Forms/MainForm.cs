@@ -14,6 +14,7 @@ namespace BomCopier.Forms
         private List<BomRow> _allBomRows = new();
         private List<BomRow> _filteredRows = new();
         private List<BomRow> _queuedFiles = new();
+        private bool _bomLoaded;
 
         public MainForm()
         {
@@ -79,22 +80,13 @@ namespace BomCopier.Forms
                 Application.DoEvents();
 
                 _allBomRows = _excelService.LoadBom(filePath, _config);
+                _bomLoaded = true;
                 _config.LastBomFile = filePath;
                 _configService.Save(_config);
 
                 // Populate materials dropdown
                 var materials = _excelService.GetUniqueMaterials(_allBomRows);
-                cmbMaterial.Items.Clear();
-                cmbMaterial.Items.Add("(All)");
-                foreach (var material in materials)
-                {
-                    cmbMaterial.Items.Add(material);
-                }
-
-                if (cmbMaterial.Items.Count > 0)
-                {
-                    cmbMaterial.SelectedIndex = 0;
-                }
+                SetMaterials(materials);
 
                 lblStatus.Text = $"Loaded {_allBomRows.Count} items from BOM";
                 lblFileCount.Text = $"{_allBomRows.Count} items";
@@ -116,10 +108,38 @@ namespace BomCopier.Forms
             }
         }
 
+        private void SetMaterials(IEnumerable<string> materials)
+        {
+            cmbMaterial.Items.Clear();
+            cmbMaterial.Items.Add("(All)");
+            foreach (var material in materials)
+            {
+                cmbMaterial.Items.Add(material);
+            }
+
+            cmbMaterial.SelectedIndex = 0;
+            cmbMaterial.Enabled = cmbMaterial.Items.Count > 1;
+        }
+
         private void SearchForFiles()
         {
-            if (_allBomRows.Count == 0)
+            if (string.IsNullOrWhiteSpace(txtSourceDirectory.Text) || !Directory.Exists(txtSourceDirectory.Text))
+            {
+                lblStatus.Text = "Source directory is invalid";
                 return;
+            }
+
+            if (!_bomLoaded)
+            {
+                LoadFilesFromDirectory();
+                return;
+            }
+
+            if (_allBomRows.Count == 0)
+            {
+                lblStatus.Text = "No BOM items loaded";
+                return;
+            }
 
             lblStatus.Text = "Searching for files...";
             Application.DoEvents();
@@ -131,6 +151,25 @@ namespace BomCopier.Forms
             int found = _allBomRows.Count(r => r.IsFound);
             int total = _allBomRows.Count;
             lblStatus.Text = $"Found {found} of {total} file entries";
+        }
+
+        private void LoadFilesFromDirectory()
+        {
+            lblStatus.Text = "Scanning source folder (no BOM)...";
+            Application.DoEvents();
+
+            _allBomRows = _fileSearchService.LoadFilesFromDirectory(
+                txtSourceDirectory.Text,
+                _config.TargetFileExtension);
+
+            SetMaterials(Array.Empty<string>());
+            RefreshAvailableList();
+
+            int total = _allBomRows.Count;
+            lblStatus.Text = total > 0
+                ? $"Found {total} file(s) (no BOM loaded)"
+                : "No files found in source folder";
+            lblFileCount.Text = $"{total} items";
         }
 
         private void RefreshAvailableList()
@@ -526,12 +565,12 @@ namespace BomCopier.Forms
             StartCopy();
         }
 
-        private void lstAvailable_Click(object sender, EventArgs e)
+        private void lstAvailable_DoubleClick(object sender, EventArgs e)
         {
             AddSelectedToQueue();
         }
 
-        private void lstQueue_Click(object sender, EventArgs e)
+        private void lstQueue_DoubleClick(object sender, EventArgs e)
         {
             RemoveSelectedFromQueue();
         }

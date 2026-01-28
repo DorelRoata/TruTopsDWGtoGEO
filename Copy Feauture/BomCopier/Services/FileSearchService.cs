@@ -111,6 +111,66 @@ namespace BomCopier.Services
         }
 
         /// <summary>
+        /// Load all files from a source directory without a BOM.
+        /// </summary>
+        public List<BomRow> LoadFilesFromDirectory(string sourceDirectory, string targetExtension)
+        {
+            var rows = new List<BomRow>();
+
+            if (string.IsNullOrWhiteSpace(sourceDirectory) || !Directory.Exists(sourceDirectory))
+            {
+                LogService.Log($"Source directory invalid or doesn't exist: {sourceDirectory}");
+                return rows;
+            }
+
+            string extension = string.IsNullOrWhiteSpace(targetExtension) ? ".dwg" : targetExtension.Trim();
+            if (!extension.StartsWith('.'))
+            {
+                extension = "." + extension;
+            }
+
+            var fileMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                foreach (var file in Directory.EnumerateFiles(sourceDirectory, "*" + extension, SearchOption.AllDirectories))
+                {
+                    string fileName = Path.GetFileName(file);
+                    if (!fileMap.ContainsKey(fileName))
+                    {
+                        fileMap[fileName] = file;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.Log($"Error scanning source directory: {ex.Message}");
+                return rows;
+            }
+
+            foreach (var entry in fileMap.OrderBy(kvp => kvp.Key))
+            {
+                string fileName = entry.Key;
+                string sourcePath = entry.Value;
+
+                rows.Add(new BomRow
+                {
+                    OriginalFileName = Path.GetFileNameWithoutExtension(fileName),
+                    NormalFileName = fileName,
+                    SuffixFileName = string.Empty,
+                    TargetFileName = fileName,
+                    Material = string.Empty,
+                    Quantity = 1,
+                    SourcePath = sourcePath,
+                    IsSuffixVersion = false
+                });
+            }
+
+            LogService.Log($"Loaded {rows.Count} files from source directory (no BOM)");
+            return rows;
+        }
+
+        /// <summary>
         /// Filter rows by material and return only found files
         /// </summary>
         public List<BomRow> FilterByMaterial(List<BomRow> rows, string material)
