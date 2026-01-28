@@ -737,16 +737,16 @@ class AutomationRunner:
 
         if not self.dry_run:
             # Show where we are going
-            self.indicator.show_highlight(x, y, duration=800)
-            pyautogui.moveTo(x, y, duration=0.2)
+            self.indicator.show_highlight(x, y, duration=500)
+            pyautogui.moveTo(x, y, duration=0.15)
             
             # Brief pause to show the highlight/location
-            time.sleep(0.3)
+            time.sleep(0.1)
             
             # Show click and execute
             self.indicator.show_click(x, y)
             pyautogui.click()
-            time.sleep(3.0) # Wait for UI to react
+            time.sleep(1.5) # Wait for UI to react
         else:
             print("  (dry run)")
 
@@ -756,7 +756,7 @@ class AutomationRunner:
 
         if not self.dry_run:
             pyautogui.press(key)
-            time.sleep(3.0)
+            time.sleep(1.0)
         else:
             print("  (dry run)")
 
@@ -767,7 +767,7 @@ class AutomationRunner:
 
         if not self.dry_run:
             pyautogui.hotkey(*keys)
-            time.sleep(3.0)
+            time.sleep(1.0)
         else:
             print("  (dry run)")
 
@@ -860,11 +860,13 @@ class AutomationRunner:
                     self._click(no_save_pos[0], no_save_pos[1], "No (don't save)")
                     time.sleep(0.5)
 
-                # Step 3: Copy filename (with extension only) to clipboard
-                self._copy_to_clipboard(file_name) 
-                print("[CLIPBOARD] Copied: {}".format(file_name))
+                # Step 3: Copy full file path to clipboard and paste it
+                # The filename box is already selected after clicking No
+                # IMPORTANT: Use full path to ensure we open the file from Filtered_DWGs
+                self._copy_to_clipboard(file_path) 
+                print("[CLIPBOARD] Copied: {}".format(file_path))
 
-                self._hotkey('ctrl', 'v', description="Paste filename")
+                self._hotkey('ctrl', 'v', description="Paste file path")
                 time.sleep(0.3)
 
                 # Step 4: Open drawing
