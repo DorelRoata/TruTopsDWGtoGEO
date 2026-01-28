@@ -22,10 +22,14 @@ from pynput import mouse, keyboard
 pyautogui.FAILSAFE = True
 
 # Default configuration
+# Default configuration
 DEFAULT_CONFIG = {
     "import_delay": 3.0,
     "save_delay": 2.0,
     "trutops_window_title": "TruTops",  # Window title to focus
+    "mode": "auto",                     # auto or manual
+    "auto_delay": 3,                    # Seconds to wait in auto mode
+    "manual_hotkey": "f1",              # Hotkey for manual trigger
     "click_locations": {
         "open_drawing": [549, 114],          # Open Drawing button (not Ctrl+O)
         "no_save": [3009, 672],              # "No" button - don't save modifications
@@ -38,6 +42,82 @@ DEFAULT_CONFIG = {
 
 CONFIG_FILE = "config.json"
 SCREENSHOTS_DIR = "ScreenShots"
+
+
+class ImagePreviewWindow(tk.Toplevel):
+    """Window to display the part preview on a second screen."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("Part Preview")
+        self.geometry("600x600")
+        self.configure(bg="black")
+        
+        # Make it persistent (don't destroy on close, just hide)
+        self.protocol("WM_DELETE_WINDOW", self.withdraw)
+        
+        self.image_label = tk.Label(self, bg="black")
+        self.image_label.pack(fill="both", expand=True)
+        
+        self.current_image = None
+        
+        # Initial overlay text
+        self.status_label = tk.Label(
+            self, text="Waiting for automation...", 
+            bg="black", fg="white", font=("Arial", 14)
+        )
+        self.status_label.place(relx=0.5, rely=0.5, anchor="center")
+
+    def show_image(self, image_path):
+        """Load and scale image to fit window."""
+        self.deiconify()
+        
+        if not os.path.exists(image_path):
+            self.status_label.config(text="Image not found:\n" + os.path.basename(image_path))
+            self.status_label.place(relx=0.5, rely=0.5, anchor="center")
+            self.image_label.configure(image='')
+            return
+
+        try:
+            # Load and resize
+            img = Image.open(image_path)
+            
+            # Get window size
+            win_width = self.winfo_width()
+            win_height = self.winfo_height()
+            
+            if win_width < 100: win_width = 600
+            if win_height < 100: win_height = 600
+            
+            # Calculate input aspect ratio
+            img_ratio = img.width / img.height
+            win_ratio = win_width / win_height
+            
+            if img_ratio > win_ratio:
+                # limited by width
+                target_width = win_width
+                target_height = int(win_width / img_ratio)
+            else:
+                # limited by height
+                target_height = win_height
+                target_width = int(win_height * img_ratio)
+                
+            img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+            
+            self.current_image = ImageTk.PhotoImage(img)
+            self.image_label.configure(image=self.current_image)
+            self.status_label.place_forget()
+            
+        except Exception as e:
+            print(f"Error loading image: {e}")
+            self.status_label.config(text=f"Error loading image")
+            self.status_label.place(relx=0.5, rely=0.5, anchor="center")
+
+    def clear(self):
+        """Clear the current image."""
+        self.image_label.configure(image='')
+        self.status_label.config(text="Waiting...")
+        self.status_label.place(relx=0.5, rely=0.5, anchor="center")
 
 
 class Config:
@@ -141,48 +221,80 @@ class ClickIndicator:
         self.indicator_window = None
 
     def show_click(self, x, y, persistent=False):
-        """Show a yellow circle at click position.
+        """Show a yellow circle at click position."""
+        self._show_overlay(x, y, "click", persistent)
 
-        Args:
-            x, y: Click coordinates
-            persistent: If True, don't auto-close (for step-by-step mode)
-        """
+    def show_highlight(self, x, y, duration=500):
+        """Show a blue target/highlight at position."""
+        self._show_overlay(x, y, "highlight", False, duration)
+
+    def _show_overlay(self, x, y, type_="click", persistent=False, duration=200):
         try:
             # Create indicator window
-            self.indicator_window = tk.Toplevel(self.app)
-            self.indicator_window.overrideredirect(True)
-            self.indicator_window.attributes('-topmost', True)
+            window = tk.Toplevel(self.app)
+            window.overrideredirect(True)
+            window.attributes('-topmost', True)
 
             # Try to make transparent (Windows)
             try:
-                self.indicator_window.attributes('-transparentcolor', 'black')
+                window.attributes('-transparentcolor', 'black')
             except:
                 pass
 
-            size = 60
-            self.indicator_window.geometry("{}x{}+{}+{}".format(
-                size, size, x - size // 2, y - size // 2
+            size = 60 if type_ == "click" else 100
+            window.geometry("{}x{}+{}+{}".format(
+                size, size, int(x - size // 2), int(y - size // 2)
             ))
-            self.indicator_window.configure(bg='black')
+            window.configure(bg='black')
 
-            # Draw circle
+            # Draw
             canvas = tk.Canvas(
-                self.indicator_window,
+                window,
                 width=size, height=size,
                 bg='black', highlightthickness=0
             )
             canvas.pack()
-            canvas.create_oval(5, 5, size-5, size-5, outline='yellow', width=4)
 
-            # Auto-close after 200ms unless persistent
+            if type_ == "click":
+                # Yellow circle for click
+                canvas.create_oval(5, 5, size-5, size-5, outline='#ffff00', width=4)
+                canvas.create_oval(15, 15, size-15, size-15, fill='', outline='#ffff00', width=2)
+                # Just outline is fine as per original, maybe thicker
+                canvas.create_oval(20, 20, size-20, size-20, outline='#ffff00', width=2)
+            else:
+                # Blue corners/box for highlight
+                color = '#00a8ff'  # Bright blue
+                # Draw corners to look like a target sight
+                l = 20 # line length
+                w = 3  # width
+                # Top-left
+                canvas.create_line(0, 0, l, 0, fill=color, width=w)
+                canvas.create_line(0, 0, 0, l, fill=color, width=w)
+                # Top-right
+                canvas.create_line(size, 0, size-l, 0, fill=color, width=w)
+                canvas.create_line(size, 0, size, l, fill=color, width=w)
+                # Bottom-left
+                canvas.create_line(0, size, 0, size-l, fill=color, width=w)
+                canvas.create_line(0, size, l, size, fill=color, width=w)
+                # Bottom-right
+                canvas.create_line(size, size, size-l, size, fill=color, width=w)
+                canvas.create_line(size, size, size, size-l, fill=color, width=w)
+
+            # Keep reference to avoid GC if needed, but for now just let it float?
+            # We need to track it to close it if persistent=False
+            
             if not persistent:
-                self.indicator_window.after(200, self._close_indicator)
+                window.after(duration, window.destroy)
+            else:
+                # If persistent, we might want to store it in self.indicator_window to close later manually
+                # But original code had logic for that. Let's keep it simple for now.
+                self.indicator_window = window
 
         except Exception as e:
             print("Indicator error: {}".format(e))
 
     def _close_indicator(self):
-        """Close the indicator window."""
+        """Close the persistent indicator window."""
         if self.indicator_window:
             try:
                 self.indicator_window.destroy()
@@ -447,17 +559,19 @@ class AutomationRunner:
         self.indicator = ClickIndicator(app)
         self.escape_pressed = False
         self.keyboard_listener = None
-        self.step_by_step = False
-        self.dry_run = False
+        self.manual_trigger = False
 
-    def start(self, files, dry_run=False, step_by_step=False):
+    def start(self, files, mode="auto", delay=3.0, manual_hotkey="f1"):
         """Start processing files."""
         self.running = True
         self.escape_pressed = False
-        self.files = files
-        self.dry_run = dry_run
-        self.step_by_step = step_by_step
+        self.files = files # List of dicts: {"dwg": path, "image": path}
+        self.mode = mode
+        self.delay = delay
+        self.manual_hotkey = manual_hotkey
+        
         self.current_index = self.config.get("last_processed_index") or 0
+        self.manual_trigger = False
 
         # Ask if resuming
         if self.current_index > 0 and self.current_index < len(files):
@@ -469,34 +583,75 @@ class AutomationRunner:
         else:
             self.current_index = 0
 
-        # Start ESC listener
-        self._start_escape_listener()
+        # Start Global Listener (ESC and Hotkey)
+        self._start_listeners()
 
         threading.Thread(target=self._run, daemon=True).start()
 
     def stop(self):
         """Stop processing."""
         self.running = False
-        self._stop_escape_listener()
+        self._stop_listeners()
         self.app.update_status("Stopped")
 
-    def _start_escape_listener(self):
-        """Start listening for ESC key."""
+    def _start_listeners(self):
+        """Start listening for keyboard events."""
         def on_press(key):
+            # Check ESC
             if key == keyboard.Key.esc:
                 print("\n[ESC PRESSED] Aborting automation...")
                 self.escape_pressed = True
                 self.running = False
+                # Signal manual trigger too just to break wait loop if stuck
+                self.manual_trigger = True 
                 return False
+            
+            # Check Manual Hotkey
+            try:
+                k = None
+                if isinstance(key, keyboard.KeyCode):
+                    k = key.char
+                elif isinstance(key, keyboard.Key):
+                    k = key.name
+                
+                # Simple check - could be improved for modifiers
+                if str(k).lower() == self.manual_hotkey.lower():
+                    print("[MANUAL TRIGGER] Hotkey pressed!")
+                    self.manual_trigger = True
+            except:
+                pass
 
         self.keyboard_listener = keyboard.Listener(on_press=on_press)
         self.keyboard_listener.start()
 
-    def _stop_escape_listener(self):
-        """Stop ESC listener."""
+    def _stop_listeners(self):
+        """Stop listeners."""
         if self.keyboard_listener:
             self.keyboard_listener.stop()
             self.keyboard_listener = None
+
+    def _wait_for_trigger(self):
+        """Wait based on mode."""
+        if not self.running: return False
+        
+        if self.mode == "auto":
+            print(f"[AUTO] Waiting {self.delay}s...")
+            # Break sleep into small chunks to remain responsive
+            for _ in range(int(self.delay * 10)):
+                if not self.running: return False
+                time.sleep(0.1)
+            return True
+        else:
+            print(f"[MANUAL] Waiting for {self.manual_hotkey}...")
+            self.app.update_status(f"WAITING FOR TRIGGER ({self.manual_hotkey.upper()}) - ESC to abort")
+            self.manual_trigger = False
+            
+            while not self.manual_trigger:
+                if not self.running: return False
+                time.sleep(0.1)
+            
+            print("[MANUAL] Trigger received")
+            return True
 
     def _focus_trutops(self):
         """Try to focus TrueTops window."""
@@ -579,10 +734,17 @@ class AutomationRunner:
         print("[CLICK] ({}, {}) - {}".format(x, y, description))
 
         if not self.dry_run:
-            pyautogui.moveTo(x, y)
-            time.sleep(0.1)
+            # Show where we are going
+            self.indicator.show_highlight(x, y, duration=800)
+            pyautogui.moveTo(x, y, duration=0.2)
+            
+            # Brief pause to show the highlight/location
+            time.sleep(0.3)
+            
+            # Show click and execute
+            self.indicator.show_click(x, y)
             pyautogui.click()
-            time.sleep(3.0)
+            time.sleep(3.0) # Wait for UI to react
         else:
             print("  (dry run)")
 
@@ -651,13 +813,19 @@ class AutomationRunner:
 
         self._focus_trutops()
         time.sleep(0.5)
+        
+        # Ensure image viewer is up
+        self.app.after(0, self.app.image_viewer.deiconify)
 
         for i in range(self.current_index, total):
             if not self.running or self.escape_pressed:
                 break
 
-            file_path = self.files[i]
-            file_name = os.path.basename(file_path)  # Just the filename with extension
+            item = self.files[i]
+            file_path = item["dwg"]
+            img_path = item["image"]
+            file_name = os.path.basename(file_path) 
+            
             self.current_index = i
             self.config.set("last_processed_index", i)
 
@@ -667,6 +835,12 @@ class AutomationRunner:
                 "Processing {} ({}/{}) - ESC to abort".format(f, i + 1, t)
             ))
             self.app.after(0, lambda i=i, t=total: self.app.update_progress(i, t))
+            
+            # SHOW IMAGE
+            if img_path:
+                self.app.after(0, lambda p=img_path: self.app.image_viewer.show_image(p))
+            else:
+                 self.app.after(0, self.app.image_viewer.clear)
 
             try:
                 print("\n--- File {}/{}: {} ---".format(i + 1, total, file_name))
@@ -684,9 +858,8 @@ class AutomationRunner:
                     self._click(no_save_pos[0], no_save_pos[1], "No (don't save)")
                     time.sleep(0.5)
 
-                # Step 3: Copy filename (with extension only) to clipboard and paste it
-                # The filename box is already selected after clicking No
-                self._copy_to_clipboard(file_name)  # Just filename, not full path
+                # Step 3: Copy filename (with extension only) to clipboard
+                self._copy_to_clipboard(file_name) 
                 print("[CLIPBOARD] Copied: {}".format(file_name))
 
                 self._hotkey('ctrl', 'v', description="Paste filename")
@@ -701,6 +874,11 @@ class AutomationRunner:
                 time.sleep(import_delay)
 
                 if not self.running:
+                    break
+                    
+                # === PAUSE POINT FOR MANUAL/AUTO MODE ===
+                # This is where the user checks the preview against TruTops
+                if not self._wait_for_trigger():
                     break
 
                 # Step 6: Click Save Selected to GEO
@@ -718,8 +896,8 @@ class AutomationRunner:
                     self._click(select_br_pos[0], select_br_pos[1], "Selection bottom-right")
                     time.sleep(0.5)
 
-                # Step 9: Enter for warning dialog (may not appear, but safe to press)
-                self._press('enter', "Warning dialog (if any)")
+                # Step 9: Enter for warning dialog
+                self._press('enter', "Warning dialog")
                 time.sleep(0.3)
 
                 # Step 10: Enter to save file
@@ -737,7 +915,7 @@ class AutomationRunner:
                 break
 
         # Cleanup
-        self._stop_escape_listener()
+        self._stop_listeners()
 
         if self.escape_pressed:
             self.app.after(0, lambda: self.app.update_status("Aborted by user (ESC)"))
@@ -784,144 +962,6 @@ class App(tk.Tk):
         self.style.configure("TLabelframe", background=self.colors["bg_light"], foreground=self.colors["fg"])
         self.style.configure("TLabelframe.Label", background=self.colors["bg"], foreground=self.colors["fg"])
         self.style.configure("TButton", background=self.colors["accent"], foreground=self.colors["fg"], padding=6)
-        self.style.map("TButton", background=[("active", self.colors["highlight"])])
-        self.style.configure("TCheckbutton", background=self.colors["bg"], foreground=self.colors["fg"])
-        self.style.configure("TProgressbar", background=self.colors["highlight"], troughcolor=self.colors["bg_light"])
-
-        self.config = Config()
-        self.automation = AutomationRunner(self)
-        self.files = []
-        self.file_status = {}
-
-        self._create_widgets()
-
-    def _create_widgets(self):
-        """Create main window widgets."""
-        # Header
-        header = tk.Label(
-            self,
-            text="TruTops DWG to GEO Converter",
-            font=("Segoe UI", 16, "bold"),
-            bg=self.colors["bg"],
-            fg=self.colors["fg"]
-        )
-        header.pack(pady=15)
-
-        # File list frame
-        list_frame = ttk.LabelFrame(self, text="DWG Files to Process", padding=10)
-        list_frame.pack(fill="both", expand=True, padx=15, pady=5)
-
-        # Add files button
-        btn_row = ttk.Frame(list_frame)
-        btn_row.pack(fill="x", pady=(0, 8))
-
-        ttk.Button(btn_row, text="Add Files", command=self._add_files).pack(side="left")
-        ttk.Button(btn_row, text="Clear", command=self._clear_files).pack(side="left", padx=5)
-
-        self.file_count_label = ttk.Label(btn_row, text="0 files")
-        self.file_count_label.pack(side="right")
-
-        # Listbox with scrollbar
-        list_container = ttk.Frame(list_frame)
-        list_container.pack(fill="both", expand=True)
-
-        scrollbar = ttk.Scrollbar(list_container)
-        scrollbar.pack(side="right", fill="y")
-
-        self.file_listbox = tk.Listbox(
-            list_container,
-            yscrollcommand=scrollbar.set,
-            font=("Consolas", 10),
-            selectmode="single",
-            bg=self.colors["bg_light"],
-            fg=self.colors["fg"],
-            selectbackground=self.colors["highlight"],
-            selectforeground="#000000",
-            highlightthickness=0,
-            bd=0
-        )
-        self.file_listbox.pack(side="left", fill="both", expand=True)
-        scrollbar.config(command=self.file_listbox.yview)
-
-        # Status
-        status_frame = ttk.Frame(self)
-        status_frame.pack(fill="x", padx=15, pady=8)
-
-        self.status_label = ttk.Label(status_frame, text="Ready - Add DWG files to start")
-        self.status_label.pack(anchor="w")
-
-        self.progress_var = tk.DoubleVar(value=0)
-        self.progress_bar = ttk.Progressbar(
-            status_frame, variable=self.progress_var, maximum=100
-        )
-        self.progress_bar.pack(fill="x", pady=8)
-
-        self.progress_label = ttk.Label(status_frame, text="0/0")
-        self.progress_label.pack(anchor="e")
-
-        # Control buttons
-        btn_frame = ttk.Frame(self)
-        btn_frame.pack(fill="x", padx=15, pady=10)
-
-        self.start_btn = ttk.Button(btn_frame, text="START", command=self._start)
-        self.start_btn.pack(side="left", padx=(0, 8))
-
-        self.stop_btn = ttk.Button(btn_frame, text="STOP", command=self._stop, state="disabled")
-        self.stop_btn.pack(side="left", padx=(0, 8))
-
-        ttk.Button(btn_frame, text="Setup Locations", command=self._setup_locations).pack(side="left")
-
-        # Info
-        info_frame = tk.Frame(self, bg=self.colors["bg_light"], padx=10, pady=8)
-        info_frame.pack(fill="x", padx=10, pady=10)
-
-        tk.Label(
-            info_frame,
-            text="Workflow (ESC to abort):",
-            font=("Segoe UI", 9, "bold"),
-            bg=self.colors["bg_light"],
-            fg=self.colors["success"]
-        ).pack(anchor="w", fill="x")
-
-        tk.Label(
-            info_frame,
-            text="Open > No > Paste > Enter x2 > Save > TL > BR > Enter x2",
-            font=("Consolas", 9),
-            bg=self.colors["bg_light"],
-            fg=self.colors["success"]
-        ).pack(anchor="w", fill="x", pady=(4, 0))
-
-    def _add_files(self):
-        """Add DWG files."""
-        files = filedialog.askopenfilenames(
-            title="Select DWG Files",
-            filetypes=[("DWG files", "*.dwg"), ("All files", "*.*")]
-        )
-        if files:
-            for f in files:
-                if f not in self.files:
-                    self.files.append(f)
-
-            self._update_file_list()
-
-    def _clear_files(self):
-        """Clear file list."""
-        self.files = []
-        self.file_status = {}
-        self._update_file_list()
-
-    def _update_file_list(self):
-        """Update the file listbox."""
-        self.file_listbox.delete(0, tk.END)
-        for i, f in enumerate(self.files):
-            name = os.path.basename(f)
-            self.file_listbox.insert(tk.END, "  {}".format(name))
-            self.file_status[i] = "pending"
-
-        self.file_count_label.config(text="{} files".format(len(self.files)))
-        self.update_progress(0, len(self.files) or 1)
-
-    def _start(self):
         """Start automation."""
         if not self.files:
             messagebox.showwarning("No Files", "Add DWG files first.")
@@ -945,7 +985,12 @@ class App(tk.Tk):
         for i in range(len(self.files)):
             self.update_file_status(i, "pending")
 
-        self.automation.start(self.files)
+        self.automation.start(
+            self.files,
+            mode=self.mode_var.get(),
+            delay=self.delay_var.get(),
+            manual_hotkey=self.config.get("manual_hotkey") or "f1"
+        )
 
     def _stop(self):
         """Stop automation."""
@@ -1011,7 +1056,7 @@ class App(tk.Tk):
             return
 
         self.file_status[index] = status
-        name = os.path.basename(self.files[index])
+        name = os.path.basename(self.files[index]["dwg"])
 
         prefix = {"pending": "  ", "processing": "> ", "done": "  "}.get(status, "  ")
         suffix = {"pending": "", "processing": " ...", "done": " [Done]"}.get(status, "")
