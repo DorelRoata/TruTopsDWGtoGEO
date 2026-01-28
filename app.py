@@ -135,6 +135,13 @@ class Config:
                 with open(CONFIG_FILE, 'r') as f:
                     saved = json.load(f)
                     self._deep_update(self.data, saved)
+                
+                # Migration: Update F1 to F2
+                if self.data.get("manual_hotkey") == "f1":
+                    print("[CONFIG] Migrating hotkey from F1 to F2")
+                    self.data["manual_hotkey"] = "f2"
+                    self.save()
+
             except (json.JSONDecodeError, IOError):
                 pass
 
