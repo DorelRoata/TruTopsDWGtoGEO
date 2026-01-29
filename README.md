@@ -212,7 +212,7 @@ This only needs to be done once (unless TrueTops UI changes).
    - Make sure the file list is visible
 
 3. **Start the automation**:
-   - Launch `app.py`
+   - Launch `TruTopsDWGtoGEO_Final.exe`
    - Verify the file list shows your DWG files
    - Click **START**
    - Don't touch the mouse/keyboard until complete
@@ -427,7 +427,7 @@ If TrueTops is slow, increase the delays in `config.json`:
 ```
 TruTopsDWGtoGEO/
 ├── README.md               # This documentation
-├── app.exe                 # Main application
+├── TruTopsDWGtoGEO_Final.exe # Main application (Red D2G Icon)
 ├── config.json             # Settings (auto-generated)
 ├── screenshots/            # Button images (auto-created)
 │   ├── save_to_geo.png

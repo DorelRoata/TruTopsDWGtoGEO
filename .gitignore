@@ -3,6 +3,19 @@
 .vscode/
 .idea/
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# PyInstaller
+*.spec
+!TruTopsDWGtoGEO_Final.spec
+build/
+dist/
+
 # Dotnet
 **/bin/
 **/obj/

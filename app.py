@@ -14,6 +14,18 @@ import time
 import copy
 from pathlib import Path
 import ctypes
+import sys
+
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
+
 
 # Enable High DPI Awareness on Windows to fix blurry UI
 try:
@@ -1051,8 +1063,15 @@ class App(tk.Tk):
         super().__init__()
 
         self.title("TruTops DWG to GEO Converter")
-        self.geometry("800x850")
-        self.minsize(800, 850)
+        self.geometry("800x850") # Taller window to prevent clipping
+        self.minsize(800, 700)
+        
+        # Set Window Icon
+        try:
+            icon_path = resource_path("d2g_custom.ico")
+            self.iconbitmap(icon_path)
+        except Exception:
+            pass # Icon not found, ignore
 
         # Slate satin theme colors
         self.colors = {
@@ -1424,17 +1443,21 @@ class App(tk.Tk):
 def main():
     """Main entry point."""
     os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
+    
+    # ANSI Colors
+    RED = "\033[91m"
+    RESET = "\033[0m"
 
-    print(r"""
-███████████      ████████████     █████████████
-████     ████   ████      ████   ████       ████
-████     ████            ████    ████
-████     ████           ████     ████    ██████
-████     ████         ████       ████       ████
-████     ████       ████         ████       ████
-████     ████     ████████████   ████       ████
-███████████      ████████████     █████████████
-    """)
+    print(RED + r"""
+██████████      ████████████      ██████████
+████    ████            ████    ████      ████
+████    ████            ████    ████
+████    ████    ████████████    ████    ██████
+████    ████    ████            ████      ████
+████    ████    ████            ████      ████
+████    ████    ████████████    ████      ████
+██████████      ████████████      ██████████
+    """ + RESET)
     print("TruTops DWG to GEO Converter")
     print("=" * 60)
     print("Screen size: {}".format(pyautogui.size()))
