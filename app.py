@@ -953,12 +953,6 @@ class AutomationRunner:
             
             # OVERLAY UPDATE
             self.app.after(0, lambda f=file_name: self.overlay.show(f"Processing: {f}", self.mode))
-            
-            # SHOW IMAGE
-            if img_path:
-                self.app.after(0, lambda p=img_path: self.app.image_viewer.show_image(p))
-            else:
-                self.app.after(0, self.app.image_viewer.clear)
 
             try:
                 print("\n--- File {}/{}: {} ---".format(i + 1, total, file_name))
@@ -971,6 +965,12 @@ class AutomationRunner:
 
                 if not self.running:
                     break
+
+                # SHOW IMAGE
+                if img_path:
+                    self.app.after(0, lambda p=img_path: self.app.image_viewer.show_image(p))
+                else:
+                    self.app.after(0, self.app.image_viewer.clear)
 
                 # Step 2: Click "No" - don't save modifications
                 if no_save_pos:
