@@ -23,6 +23,7 @@ namespace BomCopier.Forms
             cmbMaterial = new ComboBox();
             lblVariant = new Label();
             cmbVariant = new ComboBox();
+            lblVersion = new Label();
             lblFileCount = new Label();
             btnSettings = new Button();
             pnlDirectories = new Panel();
@@ -113,6 +114,14 @@ namespace BomCopier.Forms
             cmbVariant.Location = new Point(515, 17);
             cmbVariant.Size = new Size(165, 28);
             cmbVariant.SelectedIndexChanged += cmbVariant_SelectedIndexChanged;
+
+            lblVersion.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            lblVersion.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            lblVersion.ForeColor = Color.FromArgb(100, 160, 220);
+            lblVersion.Location = new Point(1012, 12);
+            lblVersion.Size = new Size(154, 20);
+            lblVersion.Text = "Version";
+            lblVersion.TextAlign = ContentAlignment.MiddleRight;
 
             lblFileCount.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             lblFileCount.Font = new Font("Segoe UI", 9F, FontStyle.Italic);
@@ -285,6 +294,7 @@ namespace BomCopier.Forms
 
             // Bottom status
             pnlBottom.BackColor = Color.FromArgb(25, 25, 30);
+            pnlBottom.Controls.Add(lblVersion);
             pnlBottom.Controls.Add(lblStatus);
             pnlBottom.Controls.Add(progressBar);
             pnlBottom.Controls.Add(btnStartCopy);
@@ -463,6 +473,7 @@ namespace BomCopier.Forms
         private ComboBox cmbMaterial;
         private Label lblVariant;
         private ComboBox cmbVariant;
+        private Label lblVersion;
         private Label lblFileCount;
         private Button btnSettings;
         private Panel pnlDirectories;
