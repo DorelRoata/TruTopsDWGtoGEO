@@ -2,7 +2,7 @@
 
 BOM Copier is a Windows desktop app for finding DWG files from an exported SolidWorks Excel BOM and copying selected drawings into a manually chosen folder. It copies files only; it never moves or deletes the source drawings.
 
-Current version: **1.1.0**
+Current version: **1.1.1**
 
 ## Workflow
 
@@ -79,7 +79,7 @@ The current project reads Excel workbooks directly through EPPlus; Microsoft Exc
 
 ## Versioning a new build
 
-The release version has one source of truth: `VersionPrefix` in `BomCopier/BomCopier.csproj`. For the next release, change that value (for example, from `1.1.0` to `1.1.1`) before building and publishing.
+The release version has one source of truth: `VersionPrefix` in `BomCopier/BomCopier.csproj`. For the next release, change that value (for example, from `1.1.1` to `1.1.2`) before building and publishing.
 
 The version is automatically applied to:
 

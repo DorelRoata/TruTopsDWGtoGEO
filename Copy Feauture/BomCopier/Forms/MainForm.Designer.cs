@@ -87,8 +87,8 @@ namespace BomCopier.Forms
             pnlTop.Controls.Add(lblFileCount);
             pnlTop.Controls.Add(btnSettings);
             pnlTop.Dock = DockStyle.Top;
-            pnlTop.Height = 62;
             pnlTop.Padding = new Padding(12);
+            pnlTop.Size = new Size(1180, 62);
 
             ConfigureButton(btnLoadBom, Color.FromArgb(45, 90, 130), Color.FromArgb(220, 230, 240));
             btnLoadBom.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
@@ -148,7 +148,7 @@ namespace BomCopier.Forms
             pnlDirectories.Controls.Add(txtTargetDirectory);
             pnlDirectories.Controls.Add(btnBrowseTarget);
             pnlDirectories.Dock = DockStyle.Top;
-            pnlDirectories.Height = 88;
+            pnlDirectories.Size = new Size(1180, 88);
 
             ConfigureLabel(lblSource, "Source folder:");
             lblSource.Location = new Point(12, 15);
@@ -299,8 +299,8 @@ namespace BomCopier.Forms
             pnlBottom.Controls.Add(progressBar);
             pnlBottom.Controls.Add(btnStartCopy);
             pnlBottom.Dock = DockStyle.Bottom;
-            pnlBottom.Height = 86;
             pnlBottom.Padding = new Padding(12);
+            pnlBottom.Size = new Size(1180, 86);
 
             lblStatus.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             lblStatus.Font = new Font("Segoe UI", 9F);
