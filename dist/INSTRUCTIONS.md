@@ -1,4 +1,4 @@
-# Manual/Auto Mode & Image Preview Walkthrough
+# D2G 1.2.0 Quick Guide
 
 I have updated the TruTops DWG to GEO Converter to support user-controlled pauses and visual verification.
 
@@ -22,10 +22,29 @@ The tool now expects the following structure when you select a project folder:
 - **Purpose**: Gives you a few seconds to glance at the Preview Window and the TruTops screen to verify match before it continues.
 
 #### Manual Mode
--3. **Manual Trigger**: The automation will pause before the "Save" step.
-   - Requires user confirmation to proceed.
-   - Press **F2** to trigger the save action.
-   - Allows time to physically check the part nesting/cleaning. Press **F2** when you are ready to proceed to the next file.
+- D2G loads the current DWG and pauses before creating the GEO.
+- Press **Ctrl+2** when you are ready to run the complete Create GEO group.
+
+### Grouped Recovery Shortcuts
+
+- **Ctrl+1** - Load the current DWG
+- **Ctrl+2** - Create the current GEO
+- **Ctrl+3** - Retry the current group
+- **Ctrl+4** - Skip the current file
+- **Ctrl+5** - Process the complete current file
+- **Esc** - Stop safely
+
+The shortcuts are accepted only while D2G is paused or recovering. This prevents accidental commands while an automation group is already running.
+
+### Smart Waiting and Locations
+
+- D2G waits for the TruTops screen to change and settle instead of using only fixed delays.
+- If the expected screen does not appear, D2G pauses and shows the recovery shortcuts.
+- Re-capture each location once in Settings to store it relative to the TruTops window.
+
+### Existing GEO Files
+
+Choose **Skip existing GEO**, **Replace existing GEO**, or **Only process changed DWGs** before starting. Existing GEO files are expected beside their matching DWGs.
 
 ### 4. Status Overlay
 - A persistent overlay appears in the bottom-left corner of the screen.

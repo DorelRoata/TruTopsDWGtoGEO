@@ -12,9 +12,28 @@ import json
 import threading
 import time
 import copy
+import re
 from pathlib import Path
 import ctypes
 import sys
+
+APP_VERSION = "1.2.0"
+
+HOTKEY_COMMANDS = {
+    "1": "load",
+    "2": "save",
+    "3": "retry",
+    "4": "skip",
+    "5": "full",
+}
+
+GEO_POLICY_LABELS = {
+    "Skip existing GEO": "skip_existing",
+    "Replace existing GEO": "replace_existing",
+    "Only process changed DWGs": "newer_only",
+}
+
+GEO_POLICY_NAMES = {value: key for key, value in GEO_POLICY_LABELS.items()}
 
 def resource_path(relative_path):
     """Get absolute path to resource, works for dev and for PyInstaller"""
@@ -22,7 +41,7 @@ def resource_path(relative_path):
         # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
-        base_path = os.path.abspath(".")
+        base_path = os.path.dirname(os.path.abspath(__file__))
     
     return os.path.join(base_path, relative_path)
 
@@ -46,10 +65,13 @@ pyautogui.FAILSAFE = True
 DEFAULT_CONFIG = {
     "import_delay": 3.0,
     "save_delay": 2.0,
+    "smart_wait_timeout": 12.0,
+    "screen_settle_time": 0.7,
     "trutops_window_title": "TruTops",  # Window title to focus
     "mode": "auto",                     # auto or manual
     "auto_delay": 3,                    # Seconds to wait in auto mode
     "manual_hotkey": "f2",              # Hotkey for manual trigger
+    "existing_geo_policy": "skip_existing",
     "click_locations": {
         "open_drawing": [549, 114],          # Open Drawing button (not Ctrl+O)
         "no_save": [3009, 672],              # "No" button - don't save modifications
@@ -57,11 +79,88 @@ DEFAULT_CONFIG = {
         "select_top_left": [75, 209],        # Top-left corner of selection box
         "select_bottom_right": [3350, 1867], # Bottom-right corner of selection box
     },
+    "relative_click_locations": {},
+    "buttons": {
+        "open_drawing": {
+            "image": "ScreenShots/Opendrawings.png",
+            "fallback_coords": None,
+        },
+        "save_selected": {
+            "image": "ScreenShots/Save Selection.png",
+            "fallback_coords": None,
+        },
+    },
     "last_processed_index": 0
 }
 
 CONFIG_FILE = "config.json"
 SCREENSHOTS_DIR = "ScreenShots"
+
+
+def find_trutops_window(partial_title="TruTops"):
+    """Return the largest visible external TruTops window, if available."""
+    title_filter = (partial_title or "TruTops").strip().lower()
+
+    try:
+        import win32gui
+
+        matches = []
+
+        def callback(hwnd, _):
+            if not win32gui.IsWindowVisible(hwnd):
+                return
+
+            title = win32gui.GetWindowText(hwnd)
+            if not title or title_filter not in title.lower():
+                return
+
+            # Do not mistake this D2G window for TruTops.
+            if "dwg to geo" in title.lower() or "d2g" == title.lower().strip():
+                return
+
+            left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+            area = max(0, right - left) * max(0, bottom - top)
+            if area:
+                matches.append({
+                    "hwnd": hwnd,
+                    "title": title,
+                    "rect": (left, top, right, bottom),
+                    "area": area,
+                })
+
+        win32gui.EnumWindows(callback, None)
+        if matches:
+            return max(matches, key=lambda item: item["area"])
+    except Exception as exc:
+        print("[WINDOW] TruTops lookup unavailable: {}".format(exc))
+
+    return None
+
+
+def to_relative_position(x, y, rect):
+    """Convert a screen coordinate to a normalized position inside a window."""
+    if not rect:
+        return None
+    left, top, right, bottom = rect
+    width = right - left
+    height = bottom - top
+    if width <= 0 or height <= 0:
+        return None
+    return [
+        round((x - left) / float(width), 6),
+        round((y - top) / float(height), 6),
+    ]
+
+
+def from_relative_position(position, rect):
+    """Convert a normalized window position back to screen coordinates."""
+    if not position or not rect:
+        return None
+    left, top, right, bottom = rect
+    return (
+        int(round(left + float(position[0]) * (right - left))),
+        int(round(top + float(position[1]) * (bottom - top))),
+    )
 
 
 class ImagePreviewWindow(tk.Toplevel):
@@ -235,22 +334,24 @@ class ButtonDetector:
     """Handles finding buttons on screen with multiple strategies."""
 
     @staticmethod
-    def find_button(image_path, fallback_coords=None):
+    def find_button(image_path, fallback_coords=None, region=None, allow_fallback=True):
         """Find a button on screen using image detection."""
+        if image_path and not os.path.isabs(image_path):
+            image_path = resource_path(image_path)
+
         if not image_path or not os.path.exists(image_path):
-            if fallback_coords:
+            if allow_fallback and fallback_coords:
                 return tuple(fallback_coords), "Saved coordinates (no image)"
             return None, "Not found (no image file)"
 
         strategies = [
             ("High confidence", {"confidence": 0.8}),
-            ("Medium confidence", {"confidence": 0.6}),
-            ("Low confidence", {"confidence": 0.5}),
+            ("Medium confidence", {"confidence": 0.7}),
         ]
 
         for name, params in strategies:
             try:
-                location = pyautogui.locateOnScreen(image_path, **params)
+                location = pyautogui.locateOnScreen(image_path, region=region, **params)
                 if location:
                     return pyautogui.center(location), name
             except Exception:
@@ -258,13 +359,15 @@ class ButtonDetector:
 
         # Try grayscale
         try:
-            location = pyautogui.locateOnScreen(image_path, confidence=0.6, grayscale=True)
+            location = pyautogui.locateOnScreen(
+                image_path, confidence=0.7, grayscale=True, region=region
+            )
             if location:
                 return pyautogui.center(location), "Grayscale match"
         except Exception:
             pass
 
-        if fallback_coords:
+        if allow_fallback and fallback_coords:
             return tuple(fallback_coords), "Saved coordinates"
 
         return None, "Not found"
@@ -447,7 +550,7 @@ class LocationSetupDialog(tk.Toplevel):
         super().__init__(parent)
         self.parent = parent
         self.config = config
-        self.title("Setup Click Locations")
+        self.title("Setup Window-Relative Click Locations")
         self.geometry("650x580")
         self.minsize(650, 580)
         self.transient(parent)
@@ -474,7 +577,10 @@ class LocationSetupDialog(tk.Toplevel):
         # Instructions
         instr = tk.Label(
             self,
-            text="Click CAPTURE, then click the button in TruTops within 5 seconds.",
+            text=(
+                "Click CAPTURE, then click the location in TruTops. "
+                "D2G stores it relative to the TruTops window so the window can move."
+            ),
             font=("Segoe UI", 10),
             bg=self.colors["bg"],
             fg=self.colors["fg"],
@@ -554,9 +660,10 @@ class LocationSetupDialog(tk.Toplevel):
         """Update status labels."""
         for key in self.locations:
             coords = self.config.get("click_locations", key)
+            relative = self.config.get("relative_click_locations", key)
             if coords:
                 self.status_labels[key].config(
-                    text="({}, {})".format(coords[0], coords[1]),
+                    text=("Relative" if relative else "({}, {})".format(coords[0], coords[1])),
                     fg=self.colors["success"]
                 )
                 self.captured[key] = True
@@ -604,7 +711,7 @@ class LocationSetupDialog(tk.Toplevel):
         if click_pos[0]:
             x, y = click_pos[0]
             print("[CAPTURE] Got click at ({}, {}) for {}".format(x, y, location_key))
-            self.config.set("click_locations", location_key, [x, y])
+            self._store_location(location_key, x, y)
             self.captured[location_key] = True
             self.after(0, lambda: self._capture_complete(location_key, x, y))
         else:
@@ -620,10 +727,25 @@ class LocationSetupDialog(tk.Toplevel):
             btn.config(state="normal")
 
         if x is not None:
+            relative = self.config.get("relative_click_locations", location_key)
             self.status_labels[location_key].config(
-                text="({}, {})".format(x, y),
+                text=("Relative" if relative else "({}, {})".format(x, y)),
                 fg=self.colors["success"]
             )
+
+    def _store_location(self, location_key, x, y):
+        """Store both a legacy absolute point and a window-relative point."""
+        self.config.set("click_locations", location_key, [x, y])
+
+        title = self.config.get("trutops_window_title") or "TruTops"
+        window = find_trutops_window(title)
+        relative = to_relative_position(x, y, window["rect"]) if window else None
+        if relative:
+            self.config.set("relative_click_locations", location_key, relative)
+            print("[CAPTURE] Stored relative position {} for {}".format(relative, location_key))
+        else:
+            self.config.set("relative_click_locations", location_key, None)
+            print("[CAPTURE] TruTops window not found; kept absolute position")
 
     def _edit_coords(self, location_key):
         """Manually edit coordinates."""
@@ -643,9 +765,10 @@ class LocationSetupDialog(tk.Toplevel):
             try:
                 parts = result.replace(" ", "").split(",")
                 x, y = int(parts[0]), int(parts[1])
-                self.config.set("click_locations", location_key, [x, y])
+                self._store_location(location_key, x, y)
+                relative = self.config.get("relative_click_locations", location_key)
                 self.status_labels[location_key].config(
-                    text="({}, {})".format(x, y),
+                    text=("Relative" if relative else "({}, {})".format(x, y)),
                     fg=self.colors["success"]
                 )
                 print("[EDIT] {} set to ({}, {})".format(location_key, x, y))
@@ -674,6 +797,15 @@ class AutomationRunner:
         self.manual_trigger = False
         self.dry_run = False
         self.step_by_step = False
+        self.ctrl_down = False
+        self.pressed_hotkeys = set()
+        self.command_event = threading.Event()
+        self.command_lock = threading.Lock()
+        self.pending_command = None
+        self.accepting_commands = False
+        self.current_group = None
+        self.current_file_path = None
+        self.trutops_window = None
 
     def start(self, files, mode="auto", delay=3.0, manual_hotkey="f1"):
         """Start processing files."""
@@ -683,6 +815,9 @@ class AutomationRunner:
         self.mode = mode
         self.delay = delay
         self.manual_hotkey = manual_hotkey
+        self.pending_command = None
+        self.command_event.clear()
+        self.accepting_commands = False
         
         self.current_index = self.config.get("last_processed_index") or 0
         self.manual_trigger = False
@@ -705,6 +840,7 @@ class AutomationRunner:
     def stop(self):
         """Stop processing."""
         self.running = False
+        self.command_event.set()
         self._stop_listeners()
         self.app.after(0, self.overlay.hide)
         self.app.update_status("Stopped")
@@ -717,27 +853,46 @@ class AutomationRunner:
                 print("\n[ESC PRESSED] Aborting automation...")
                 self.escape_pressed = True
                 self.running = False
-                # Signal manual trigger too just to break wait loop if stuck
-                self.manual_trigger = True 
+                self.command_event.set()
                 return False
-            
-            # Check Manual Hotkey
-            try:
-                k = None
-                if isinstance(key, keyboard.KeyCode):
-                    k = key.char
-                elif isinstance(key, keyboard.Key):
-                    k = key.name
-                
-                # Simple check - could be improved for modifiers
-                if str(k).lower() == self.manual_hotkey.lower():
-                    print("[MANUAL TRIGGER] Hotkey pressed!")
-                    self.manual_trigger = True
-            except:
-                pass
 
-        self.keyboard_listener = keyboard.Listener(on_press=on_press)
+            try:
+                ctrl_keys = {keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r}
+                if key in ctrl_keys:
+                    self.ctrl_down = True
+                    return
+
+                if self.ctrl_down and isinstance(key, keyboard.KeyCode):
+                    number = str(key.char or "").lower()
+                    if number not in HOTKEY_COMMANDS and getattr(key, "vk", None) in range(48, 58):
+                        number = chr(key.vk)
+                    if number in HOTKEY_COMMANDS and number not in self.pressed_hotkeys:
+                        self.pressed_hotkeys.add(number)
+                        self._queue_command(HOTKEY_COMMANDS[number], number)
+            except Exception as exc:
+                print("[HOTKEY] Listener error: {}".format(exc))
+
+        def on_release(key):
+            ctrl_keys = {keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r}
+            if key in ctrl_keys:
+                self.ctrl_down = False
+                self.pressed_hotkeys.clear()
+            elif isinstance(key, keyboard.KeyCode):
+                self.pressed_hotkeys.discard(str(key.char or "").lower())
+
+        self.keyboard_listener = keyboard.Listener(on_press=on_press, on_release=on_release)
         self.keyboard_listener.start()
+
+    def _queue_command(self, command, number):
+        """Queue a grouped shortcut while D2G is waiting for help."""
+        if not self.accepting_commands:
+            print("[HOTKEY] Ctrl+{} ignored while automation is busy".format(number))
+            return
+
+        with self.command_lock:
+            self.pending_command = command
+            self.command_event.set()
+        print("[HOTKEY] Ctrl+{} -> {}".format(number, command))
 
     def _stop_listeners(self):
         """Stop listeners."""
@@ -745,93 +900,187 @@ class AutomationRunner:
             self.keyboard_listener.stop()
             self.keyboard_listener = None
 
+    def _wait_for_command(self, message):
+        """Pause safely until one grouped Ctrl shortcut is pressed."""
+        instructions = (
+            "Ctrl+1 Load | Ctrl+2 Create GEO | Ctrl+3 Retry | "
+            "Ctrl+4 Skip File | Ctrl+5 Full File | Esc Stop"
+        )
+        print("[RECOVERY] {}".format(message))
+        print("[RECOVERY] {}".format(instructions))
+
+        with self.command_lock:
+            self.pending_command = None
+            self.command_event.clear()
+            self.accepting_commands = True
+
+        self.app.after(0, lambda: self.overlay.show(
+            "{}\n{}".format(message, instructions), "PAUSED"
+        ))
+        self.app.after(0, lambda: self.app.update_status(
+            "{} - {}".format(message, instructions)
+        ))
+
+        while self.running and not self.escape_pressed:
+            if self.command_event.wait(0.1):
+                break
+
+        with self.command_lock:
+            command = self.pending_command
+            self.pending_command = None
+            self.command_event.clear()
+            self.accepting_commands = False
+
+        return command
+
     def _wait_for_trigger(self):
-        """Wait based on mode."""
-        if not self.running: return False
-        
-        if self.mode == "auto":
-            print(f"[AUTO] Waiting {self.delay}s...")
-            # Break sleep into small chunks to remain responsive
-            for _ in range(int(self.delay * 10)):
-                if not self.running: return False
-                time.sleep(0.1)
-            return True
-        else:
-            print(f"[MANUAL] Waiting for {self.manual_hotkey}...")
-            self.app.update_status(f"WAITING FOR TRIGGER ({self.manual_hotkey.upper()}) - ESC to abort")
-            self.manual_trigger = False
-            
-            while not self.manual_trigger:
-                if not self.running: return False
-                time.sleep(0.1)
-            
-            print("[MANUAL] Trigger received")
-            return True
+        """Retained compatibility wrapper for the configurable auto pause."""
+        return self._interruptible_delay(self.delay)
+
+    def _interruptible_delay(self, seconds):
+        """Wait without preventing ESC from stopping the runner."""
+        deadline = time.monotonic() + max(0.0, float(seconds))
+        while time.monotonic() < deadline:
+            if not self.running or self.escape_pressed:
+                return False
+            time.sleep(min(0.1, max(0.0, deadline - time.monotonic())))
+        return self.running and not self.escape_pressed
 
     def _focus_trutops(self):
         """Try to focus TrueTops window."""
         try:
-            title = self.config.get("trutops_window_title")
-            if not title:
-                # No window title configured - skip focusing
-                print("[FOCUS] Skipped (no window configured)")
-                return True
+            import win32con
+            import win32gui
 
-            # Try pyautogui first
-            windows = pyautogui.getWindowsWithTitle(title)
-            if windows:
-                win = windows[0]
-                try:
-                    # Try multiple activation methods
-                    win.minimize()
-                    win.restore()
-                    win.activate()
-                    time.sleep(0.3)
-                    print("[FOCUS] Activated: {}".format(win.title))
-                    return True
-                except Exception as e:
-                    print("[FOCUS] pyautogui activate failed: {}".format(e))
-
-            # Fallback: Try win32gui directly
-            try:
-                import win32gui
-                import win32con
-
-                def find_window(hwnd, windows_list):
-                    if win32gui.IsWindowVisible(hwnd):
-                        window_title = win32gui.GetWindowText(hwnd)
-                        if title.lower() in window_title.lower():
-                            windows_list.append((hwnd, window_title))
-
-                found = []
-                win32gui.EnumWindows(find_window, found)
-
-                if found:
-                    hwnd, win_title = found[0]
-                    # Force to foreground
-                    win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-                    win32gui.SetForegroundWindow(hwnd)
-                    time.sleep(0.3)
-                    print("[FOCUS] win32gui activated: {}".format(win_title))
-                    return True
-                else:
-                    # List all windows for debugging
-                    all_windows = []
-                    win32gui.EnumWindows(lambda h, l: l.append(win32gui.GetWindowText(h)) if win32gui.GetWindowText(h) else None, all_windows)
-                    print("[FOCUS] Window '{}' not found!".format(title))
-                    print("[FOCUS] Available windows containing 'tru':")
-                    for w in all_windows:
-                        if 'tru' in w.lower():
-                            print("  - {}".format(w))
-                    return False
-
-            except ImportError:
-                print("[FOCUS] win32gui not available - install pywin32: pip install pywin32")
+            title = self.config.get("trutops_window_title") or "TruTops"
+            self.trutops_window = find_trutops_window(title)
+            if not self.trutops_window:
+                print("[FOCUS] Window '{}' not found".format(title))
                 return False
+
+            hwnd = self.trutops_window["hwnd"]
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            win32gui.SetForegroundWindow(hwnd)
+            self._interruptible_delay(0.25)
+            print("[FOCUS] Activated: {}".format(self.trutops_window["title"]))
+            return True
 
         except Exception as e:
             print("[FOCUS] Error: {}".format(e))
             return False
+
+    def _window_rect(self):
+        """Return the current TruTops rectangle, refreshing it after moves/resizes."""
+        title = self.config.get("trutops_window_title") or "TruTops"
+        window = find_trutops_window(title)
+        if window:
+            self.trutops_window = window
+            return window["rect"]
+        return self.trutops_window["rect"] if self.trutops_window else None
+
+    def _window_region(self):
+        rect = self._window_rect()
+        if not rect:
+            return None
+        left, top, right, bottom = rect
+        if left < 0 or top < 0:
+            return None
+        return (left, top, right - left, bottom - top)
+
+    def _resolve_location(self, location_key, prefer_image=False):
+        """Resolve an image match, relative point, or legacy absolute point."""
+        rect = self._window_rect()
+
+        if prefer_image:
+            image_path = self.config.get("buttons", location_key, "image")
+            pos, strategy = ButtonDetector.find_button(
+                image_path,
+                region=self._window_region(),
+                allow_fallback=False,
+            )
+            if pos:
+                print("[LOCATION] {} found via {}".format(location_key, strategy))
+                return tuple(pos)
+
+        relative = self.config.get("relative_click_locations", location_key)
+        position = from_relative_position(relative, rect)
+        if position:
+            print("[LOCATION] {} resolved relative to TruTops".format(location_key))
+            return position
+
+        absolute = self.config.get("click_locations", location_key)
+        if absolute:
+            print("[LOCATION] {} using legacy absolute coordinates".format(location_key))
+            return tuple(absolute)
+
+        return None
+
+    def _capture_signature(self):
+        """Capture a small grayscale signature of the TruTops window."""
+        try:
+            rect = self._window_rect()
+            image = ImageGrab.grab(bbox=rect, all_screens=True) if rect else ImageGrab.grab(all_screens=True)
+            image = image.convert("L").resize((96, 54), Image.Resampling.BILINEAR)
+            return bytes(image.tobytes())
+        except Exception as exc:
+            print("[WAIT] Screen capture unavailable: {}".format(exc))
+            return None
+
+    @staticmethod
+    def _signature_difference(first, second):
+        if not first or not second or len(first) != len(second):
+            return 0.0
+        total = sum(abs(a - b) for a, b in zip(first, second))
+        return total / float(len(first) * 255)
+
+    def _wait_for_ui_transition(self, before, description, timeout=None, require_change=True):
+        """Wait for a screen change to finish instead of sleeping a fixed amount."""
+        if self.dry_run:
+            return True
+        if before is None:
+            return self._interruptible_delay(0.8)
+
+        timeout = float(timeout or self.config.get("smart_wait_timeout") or 12.0)
+        settle_time = float(self.config.get("screen_settle_time") or 0.7)
+        deadline = time.monotonic() + timeout
+        previous = before
+        changed = not require_change
+        stable_since = None
+
+        while time.monotonic() < deadline:
+            if not self.running or self.escape_pressed:
+                return False
+
+            current = self._capture_signature()
+            if current is None:
+                return self._interruptible_delay(0.8)
+
+            if self._signature_difference(before, current) >= 0.0025:
+                changed = True
+
+            frame_change = self._signature_difference(previous, current)
+            if changed and frame_change <= 0.0015:
+                if stable_since is None:
+                    stable_since = time.monotonic()
+                elif time.monotonic() - stable_since >= settle_time:
+                    print("[WAIT] {} ready".format(description))
+                    return True
+            else:
+                stable_since = None
+
+            previous = current
+            time.sleep(0.2)
+
+        print("[WAIT] Timed out waiting for {}".format(description))
+        return False
+
+    def _smart_action(self, action, description, timeout=None, require_change=True):
+        """Run an input action and wait until TruTops finishes changing."""
+        before = self._capture_signature()
+        action()
+        return self._wait_for_ui_transition(
+            before, description, timeout=timeout, require_change=require_change
+        )
 
     def _wait_for_confirm(self, action_desc):
         """In step-by-step mode, wait for user to press Enter."""
@@ -845,21 +1094,13 @@ class AutomationRunner:
         return True
 
     def _click(self, x, y, description=""):
-        """Click at position - simple screen click."""
+        """Click without creating a focus-stealing helper window."""
         print("[CLICK] ({}, {}) - {}".format(x, y, description))
 
         if not self.dry_run:
-            # Show where we are going
-            self.indicator.show_highlight(x, y, duration=500)
             pyautogui.moveTo(x, y, duration=0.15)
-            
-            # Brief pause to show the highlight/location
-            time.sleep(0.1)
-            
-            # Show click and execute
-            self.indicator.show_click(x, y)
             pyautogui.click()
-            time.sleep(1.5) # Wait for UI to react
+            time.sleep(0.15)
         else:
             print("  (dry run)")
 
@@ -869,7 +1110,7 @@ class AutomationRunner:
 
         if not self.dry_run:
             pyautogui.press(key)
-            time.sleep(1.0)
+            time.sleep(0.15)
         else:
             print("  (dry run)")
 
@@ -880,7 +1121,7 @@ class AutomationRunner:
 
         if not self.dry_run:
             pyautogui.hotkey(*keys)
-            time.sleep(1.0)
+            time.sleep(0.2)
         else:
             print("  (dry run)")
 
@@ -907,29 +1148,295 @@ class AutomationRunner:
         process = subprocess.Popen(['clip'], stdin=subprocess.PIPE)
         process.communicate(text.encode('utf-8'))
 
+    @staticmethod
+    def _expected_geo_path(dwg_path):
+        """Return the GEO path used by the existing same-folder workflow."""
+        return os.path.splitext(dwg_path)[0] + ".geo"
+
+    @classmethod
+    def _existing_geo_path(cls, dwg_path):
+        """Find the normal GEO name or TruTops' numbered selection name."""
+        expected = cls._expected_geo_path(dwg_path)
+        if os.path.exists(expected):
+            return expected
+
+        folder = os.path.dirname(dwg_path)
+        stem = os.path.splitext(os.path.basename(dwg_path))[0]
+        pattern = re.compile(r"^{}_(\d+)\.geo$".format(re.escape(stem)), re.IGNORECASE)
+        matches = []
+        try:
+            for name in os.listdir(folder):
+                if pattern.match(name):
+                    matches.append(os.path.join(folder, name))
+        except OSError:
+            return None
+
+        return max(matches, key=os.path.getmtime) if matches else None
+
+    def _skip_reason(self, dwg_path):
+        """Return a reason to skip a DWG according to the selected policy."""
+        policy = self.config.get("existing_geo_policy") or "skip_existing"
+        geo_path = self._existing_geo_path(dwg_path)
+        if policy == "replace_existing" or not geo_path:
+            return None
+        if policy == "skip_existing":
+            return "GEO already exists"
+        if policy == "newer_only" and os.path.getmtime(dwg_path) <= os.path.getmtime(geo_path):
+            return "GEO is newer than DWG"
+        return None
+
+    def _dialog_kind(self):
+        """Best-effort classification of a TruTops warning or save dialog."""
+        try:
+            import win32con
+            import win32gui
+            import win32process
+
+            if not self.trutops_window:
+                return "unknown"
+
+            main_hwnd = self.trutops_window["hwnd"]
+            _, main_pid = win32process.GetWindowThreadProcessId(main_hwnd)
+            foreground = win32gui.GetForegroundWindow()
+            main_rect = self._window_rect()
+            main_area = 1
+            if main_rect:
+                main_area = max(1, (main_rect[2] - main_rect[0]) * (main_rect[3] - main_rect[1]))
+
+            dialogs = []
+
+            def enum_window(hwnd, _):
+                if hwnd == main_hwnd or not win32gui.IsWindowVisible(hwnd):
+                    return
+                _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                if pid != main_pid:
+                    return
+                owner = win32gui.GetWindow(hwnd, win32con.GW_OWNER)
+                if hwnd != foreground and owner != main_hwnd:
+                    return
+
+                texts = [win32gui.GetWindowText(hwnd)]
+
+                def enum_child(child, child_texts):
+                    if win32gui.IsWindowVisible(child):
+                        text_value = win32gui.GetWindowText(child)
+                        if text_value:
+                            child_texts.append(text_value)
+
+                win32gui.EnumChildWindows(hwnd, enum_child, texts)
+                rect = win32gui.GetWindowRect(hwnd)
+                area = max(0, rect[2] - rect[0]) * max(0, rect[3] - rect[1])
+                dialogs.append((" ".join(texts).lower(), area / float(main_area)))
+
+            win32gui.EnumWindows(enum_window, None)
+
+            for text_value, area_ratio in dialogs:
+                if any(token in text_value for token in (
+                    "warning", "multiple geometr", "save changes", "don't save", "do not save"
+                )):
+                    return "warning"
+                if any(token in text_value for token in (
+                    ".geo", "file name", "filename", "save as", "file browser"
+                )):
+                    return "save"
+                if any(token in text_value for token in (
+                    ".dwg", "open drawing", "open file"
+                )):
+                    return "file"
+                if area_ratio < 0.35:
+                    return "warning"
+                return "file"
+        except Exception as exc:
+            print("[DIALOG] Detection unavailable: {}".format(exc))
+
+        return "unknown"
+
+    def _show_group(self, group, file_name):
+        self.current_group = group
+        label = "Load DWG" if group == "load" else "Create GEO"
+        self.app.after(0, lambda: self.overlay.show(
+            "{}: {}".format(label, file_name), self.mode
+        ))
+        self.app.after(0, lambda: self.app.update_status(
+            "{} - {}".format(label, file_name)
+        ))
+
+    def _run_load_group(self, item):
+        """Open and import the current DWG as one recoverable operation."""
+        file_path = item["dwg"]
+        file_name = os.path.basename(file_path)
+        self._show_group("load", file_name)
+
+        if item.get("image"):
+            self.app.after(0, lambda p=item["image"]: self.app.image_viewer.show_image(p))
+        else:
+            self.app.after(0, self.app.image_viewer.clear)
+        self._interruptible_delay(0.2)
+
+        if not self._focus_trutops():
+            return False, "TruTops could not be focused"
+
+        open_pos = self._resolve_location("open_drawing", prefer_image=True)
+        if not open_pos:
+            return False, "Open Drawing location was not found"
+        if not self._smart_action(
+            lambda: self._click(open_pos[0], open_pos[1], "Open Drawing"),
+            "Open Drawing screen",
+        ):
+            return False, "Open Drawing screen did not appear"
+
+        # Opening another drawing normally asks whether to save the current one.
+        # If TruTops went directly to its file browser, do not click the old No
+        # coordinates on top of that browser.
+        if self._dialog_kind() != "file":
+            no_save_pos = self._resolve_location("no_save")
+            if not no_save_pos:
+                return False, "No button location was not found"
+            if not self._smart_action(
+                lambda: self._click(no_save_pos[0], no_save_pos[1], "No (don't save)"),
+                "DWG file browser",
+            ):
+                return False, "DWG file browser did not appear"
+        else:
+            print("[DIALOG] File browser already open; skipped No button")
+
+        self._copy_to_clipboard(file_path)
+        print("[CLIPBOARD] Copied full path: {}".format(file_path))
+
+        def open_file():
+            self._hotkey('ctrl', 'a', description="Select filename")
+            self._hotkey('ctrl', 'v', description="Paste full DWG path")
+            self._press('enter', "Open drawing")
+
+        if not self._smart_action(open_file, "DWG import options"):
+            return False, "DWG import options did not appear"
+
+        import_timeout = max(
+            float(self.config.get("smart_wait_timeout") or 12.0),
+            float(self.config.get("import_delay") or 3.0) + 5.0,
+        )
+        if not self._smart_action(
+            lambda: self._press('enter', "Confirm import settings"),
+            "imported drawing",
+            timeout=import_timeout,
+        ):
+            return False, "The drawing did not finish importing"
+
+        return True, None
+
+    def _run_save_group(self, item):
+        """Select the drawing and save it to GEO as one recoverable operation."""
+        file_name = os.path.basename(item["dwg"])
+        self._show_group("save", file_name)
+
+        if not self._focus_trutops():
+            return False, "TruTops could not be focused"
+
+        save_pos = self._resolve_location("save_selected", prefer_image=True)
+        if not save_pos:
+            return False, "Save Selected location was not found"
+        if not self._smart_action(
+            lambda: self._click(save_pos[0], save_pos[1], "Save Selected to GEO"),
+            "selection mode",
+            require_change=False,
+        ):
+            return False, "Selection mode was not ready"
+
+        top_left = self._resolve_location("select_top_left")
+        bottom_right = self._resolve_location("select_bottom_right")
+        if not top_left or not bottom_right:
+            return False, "Selection area locations were not found"
+
+        def select_geometry():
+            self._click(top_left[0], top_left[1], "Selection top-left")
+            self._click(bottom_right[0], bottom_right[1], "Selection bottom-right")
+
+        if not self._smart_action(select_geometry, "selected geometry"):
+            return False, "The geometry selection did not finish"
+
+        # The warning only appears for some DWGs. Detect it instead of always
+        # sending two Enter presses and shifting the workflow out of sequence.
+        if self._dialog_kind() == "warning":
+            if not self._smart_action(
+                lambda: self._press('enter', "Confirm optional geometry warning"),
+                "GEO save dialog",
+            ):
+                return False, "The optional warning did not close"
+
+        save_timeout = max(
+            float(self.config.get("smart_wait_timeout") or 12.0),
+            float(self.config.get("save_delay") or 2.0) + 4.0,
+        )
+        if not self._smart_action(
+            lambda: self._press('enter', "Save GEO"),
+            "completed GEO save",
+            timeout=save_timeout,
+        ):
+            return False, "The GEO save screen did not close"
+
+        return True, None
+
+    def _process_current_file(self, item):
+        """Run both groups, pausing for grouped keyboard recovery as needed."""
+        phase = "load"
+        run_full = self.mode == "auto"
+
+        while self.running and not self.escape_pressed:
+            if phase == "load":
+                success, reason = self._run_load_group(item)
+            else:
+                success, reason = self._run_save_group(item)
+
+            if success:
+                if phase == "save":
+                    return "done"
+
+                phase = "save"
+                if run_full:
+                    self.app.after(0, lambda: self.overlay.show(
+                        "Drawing loaded - preparing Create GEO", self.mode
+                    ))
+                    if not self._interruptible_delay(self.delay):
+                        return "stopped"
+                    continue
+
+                command = self._wait_for_command(
+                    "DWG loaded. Use Ctrl+2 to Create GEO"
+                )
+            else:
+                command = self._wait_for_command(
+                    "{} failed: {}".format(
+                        "Load DWG" if phase == "load" else "Create GEO", reason
+                    )
+                )
+
+            if not command:
+                return "stopped"
+            if command == "skip":
+                return "skipped"
+            if command == "retry":
+                continue
+            if command == "load":
+                phase = "load"
+                run_full = False
+            elif command == "save":
+                phase = "save"
+                run_full = False
+            elif command == "full":
+                phase = "load"
+                run_full = True
+
+        return "stopped"
+
     def _run(self):
         """Main automation loop."""
-        import_delay = self.config.get("import_delay") or 3.0
-        save_delay = self.config.get("save_delay") or 2.0
-
-        # Get all click locations
-        open_drawing_pos = self.config.get("click_locations", "open_drawing")
-        no_save_pos = self.config.get("click_locations", "no_save")
-        save_selected_pos = self.config.get("click_locations", "save_selected")
-        select_tl_pos = self.config.get("click_locations", "select_top_left")
-        select_br_pos = self.config.get("click_locations", "select_bottom_right")
-
         total = len(self.files)
+        processed = 0
+        skipped = 0
 
-        # Focus TrueTops first
         print("\n" + "=" * 50)
-        print("STARTING AUTOMATION - Press ESC to abort")
+        print("STARTING D2G {} - Press ESC to abort".format(APP_VERSION))
         print("=" * 50)
-
-        self._focus_trutops()
-        time.sleep(0.5)
-        
-        # Ensure image viewer is up
         self.app.after(0, self.app.image_viewer.deiconify)
 
         for i in range(self.current_index, total):
@@ -938,100 +1445,44 @@ class AutomationRunner:
 
             item = self.files[i]
             file_path = item["dwg"]
-            img_path = item["image"]
-            file_name = os.path.basename(file_path) 
-            
+            file_name = os.path.basename(file_path)
+
             self.current_index = i
+            self.current_file_path = file_path
             self.config.set("last_processed_index", i)
 
-            # Update UI
+            reason = self._skip_reason(file_path)
+            if reason:
+                skipped += 1
+                print("[SKIP] {} - {}".format(file_name, reason))
+                self.app.after(0, lambda i=i: self.app.update_file_status(i, "skipped"))
+                self.app.after(0, lambda f=file_name, r=reason: self.app.update_status(
+                    "Skipped {}: {}".format(f, r)
+                ))
+                self.app.after(0, lambda n=i + 1, t=total: self.app.update_progress(n, t))
+                continue
+
             self.app.after(0, lambda i=i: self.app.update_file_status(i, "processing"))
             self.app.after(0, lambda f=file_name, i=i, t=total: self.app.update_status(
                 "Processing {} ({}/{}) - ESC to abort".format(f, i + 1, t)
             ))
             self.app.after(0, lambda i=i, t=total: self.app.update_progress(i, t))
-            
-            # OVERLAY UPDATE
-            self.app.after(0, lambda f=file_name: self.overlay.show(f"Processing: {f}", self.mode))
 
             try:
                 print("\n--- File {}/{}: {} ---".format(i + 1, total, file_name))
-
-                # Step 1: Click Open Drawing button
-                self.app.after(0, lambda: self.overlay.show("Opening Drawing...", self.mode))
-                if open_drawing_pos:
-                    self._click(open_drawing_pos[0], open_drawing_pos[1], "Open Drawing")
-                    time.sleep(0.5)
-
-                if not self.running:
-                    break
-
-                # SHOW IMAGE
-                if img_path:
-                    self.app.after(0, lambda p=img_path: self.app.image_viewer.show_image(p))
+                outcome = self._process_current_file(item)
+                if outcome == "done":
+                    processed += 1
+                    self.app.after(0, lambda i=i: self.app.update_file_status(i, "done"))
+                    self.app.after(0, lambda n=i + 1, t=total: self.app.update_progress(n, t))
+                    print("Done!")
+                elif outcome == "skipped":
+                    skipped += 1
+                    self.app.after(0, lambda i=i: self.app.update_file_status(i, "skipped"))
+                    self.app.after(0, lambda n=i + 1, t=total: self.app.update_progress(n, t))
+                    print("Skipped by operator")
                 else:
-                    self.app.after(0, self.app.image_viewer.clear)
-
-                # Step 2: Click "No" - don't save modifications
-                if no_save_pos:
-                    self._click(no_save_pos[0], no_save_pos[1], "No (don't save)")
-                    time.sleep(0.5)
-
-                # Step 3: Copy filename to clipboard and paste it
-                # The filename box is already selected after clicking No
-                # User must ensure TruTops is in the correct folder (Filtered_DWGs)
-                self.app.after(0, lambda: self.overlay.show("Pasting Filename...", self.mode))
-                self._copy_to_clipboard(file_name) 
-                print("[CLIPBOARD] Copied: {}".format(file_name))
-
-                self._hotkey('ctrl', 'v', description="Paste file path")
-                time.sleep(0.3)
-
-                # Step 4: Open drawing
-                self._press('enter', "Open drawing")
-                time.sleep(1.0)
-
-                # Step 5: Confirm import settings
-                self._press('enter', "Confirm import settings")
-                time.sleep(import_delay)
-
-                if not self.running:
                     break
-                    
-                # === PAUSE POINT FOR MANUAL/AUTO MODE ===
-                # This is where the user checks the preview against TruTops
-                self.app.after(0, lambda: self.overlay.show("Waiting for Trigger...", self.mode))
-                if not self._wait_for_trigger():
-                    break
-
-                # Step 6: Click Save Selected to GEO
-                if save_selected_pos:
-                    self._click(save_selected_pos[0], save_selected_pos[1], "Save Selected to GEO")
-                    time.sleep(0.5)
-
-                # Step 7: Click top-left corner of selection box
-                # Step 5: Select all elements (drag box)
-                self.app.after(0, lambda: self.overlay.show("Selecting Elements...", self.mode))
-                if select_tl_pos:
-                    self._click(select_tl_pos[0], select_tl_pos[1], "Selection top-left")
-                    time.sleep(0.3)
-
-                # Step 8: Click bottom-right corner of selection box
-                if select_br_pos:
-                    self._click(select_br_pos[0], select_br_pos[1], "Selection bottom-right")
-                    time.sleep(0.5)
-
-                # Step 9: Enter for warning dialog
-                self._press('enter', "Warning dialog")
-                time.sleep(0.3)
-
-                # Step 10: Enter to save file
-                self._press('enter', "Save file")
-                time.sleep(save_delay)
-
-                # Mark complete
-                self.app.after(0, lambda i=i: self.app.update_file_status(i, "done"))
-                print("Done!")
 
             except Exception as e:
                 print("ERROR: {}".format(e))
@@ -1039,7 +1490,7 @@ class AutomationRunner:
                 self.running = False
                 break
 
-        # Cleanup
+        self.accepting_commands = False
         self._stop_listeners()
 
         if self.escape_pressed:
@@ -1047,9 +1498,10 @@ class AutomationRunner:
             self.app.after(0, lambda: messagebox.showinfo("Aborted", "Automation stopped by ESC key"))
         elif self.running:
             self.config.set("last_processed_index", 0)
-            self.app.after(0, lambda: self.app.update_status("Complete!"))
+            summary = "Complete: {} processed, {} skipped".format(processed, skipped)
+            self.app.after(0, lambda s=summary: self.app.update_status(s))
             self.app.after(0, lambda: self.app.update_progress(total, total))
-            self.app.after(0, lambda: messagebox.showinfo("Done", "Processed {} files!".format(total)))
+            self.app.after(0, lambda s=summary: messagebox.showinfo("Done", s))
 
         self.running = False
         self.app.after(0, self.overlay.hide)
@@ -1062,9 +1514,9 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("TruTops DWG to GEO Converter")
-        self.geometry("800x850") # Taller window to prevent clipping
-        self.minsize(800, 700)
+        self.title("TruTops DWG to GEO Converter v{}".format(APP_VERSION))
+        self.geometry("800x920")
+        self.minsize(800, 760)
         
         # Set Window Icon
         try:
@@ -1112,7 +1564,7 @@ class App(tk.Tk):
         
         tk.Label(
             header_frame, 
-            text="TruTops DWG to GEO", 
+            text="TruTops DWG to GEO  v{}".format(APP_VERSION),
             font=("Segoe UI", 18, "bold"),
             bg=self.colors["bg"], fg=self.colors["fg"]
         ).pack()
@@ -1164,12 +1616,42 @@ class App(tk.Tk):
             command=self._on_mode_change
         ).pack(side="left")
         
-        hk = self.config.get("manual_hotkey") or "F1"
         tk.Label(
-            manual_frame, text=f"(Press '{hk.upper()}' to continue)", 
+            manual_frame, text="(Loads the DWG, then waits for Ctrl+2 to create the GEO)",
             bg=self.colors["bg_light"], fg=self.colors["accent"],
             font=("Segoe UI", 9, "italic")
         ).pack(side="left", padx=10)
+
+        policy_frame = tk.Frame(mode_frame, bg=self.colors["bg_light"])
+        policy_frame.pack(fill="x", pady=(8, 2))
+        tk.Label(
+            policy_frame, text="Existing GEO:",
+            bg=self.colors["bg_light"], fg=self.colors["fg"]
+        ).pack(side="left")
+
+        current_policy = self.config.get("existing_geo_policy") or "skip_existing"
+        self.geo_policy_var = tk.StringVar(
+            value=GEO_POLICY_NAMES.get(current_policy, "Skip existing GEO")
+        )
+        self.geo_policy_combo = ttk.Combobox(
+            policy_frame,
+            textvariable=self.geo_policy_var,
+            values=list(GEO_POLICY_LABELS.keys()),
+            state="readonly",
+            width=31,
+        )
+        self.geo_policy_combo.pack(side="left", padx=(8, 0))
+        self.geo_policy_combo.bind("<<ComboboxSelected>>", self._on_geo_policy_change)
+
+        tk.Label(
+            mode_frame,
+            text=(
+                "Recovery shortcuts: Ctrl+1 Load DWG  |  Ctrl+2 Create GEO  |  "
+                "Ctrl+3 Retry  |  Ctrl+4 Skip File  |  Ctrl+5 Full File"
+            ),
+            bg=self.colors["bg_light"], fg=self.colors["highlight"],
+            font=("Segoe UI", 9), wraplength=730, justify="left"
+        ).pack(fill="x", pady=(8, 0))
 
         # File List
         list_frame = ttk.LabelFrame(self, text="File Queue", padding=10)
@@ -1237,6 +1719,11 @@ class App(tk.Tk):
     def _on_mode_change(self):
         """Save mode change."""
         self.config.set("mode", self.mode_var.get())
+
+    def _on_geo_policy_change(self, _event=None):
+        """Save the selected behavior for existing GEO files."""
+        policy = GEO_POLICY_LABELS.get(self.geo_policy_var.get(), "skip_existing")
+        self.config.set("existing_geo_policy", policy)
 
     def _add_files(self):
         """Select project folder and find files."""
@@ -1416,8 +1903,12 @@ class App(tk.Tk):
         self.file_status[index] = status
         name = os.path.basename(self.files[index]["dwg"])
 
-        prefix = {"pending": "  ", "processing": "> ", "done": "  "}.get(status, "  ")
-        suffix = {"pending": "", "processing": " ...", "done": " [Done]"}.get(status, "")
+        prefix = {
+            "pending": "  ", "processing": "> ", "done": "  ", "skipped": "  "
+        }.get(status, "  ")
+        suffix = {
+            "pending": "", "processing": " ...", "done": " [Done]", "skipped": " [Skipped]"
+        }.get(status, "")
 
         text = "{}{}{}".format(prefix, name, suffix)
 
@@ -1427,6 +1918,7 @@ class App(tk.Tk):
         colors = {
             "done": self.colors["success"],
             "processing": self.colors["processing"],
+            "skipped": self.colors["accent"],
             "pending": self.colors["fg"]
         }
         self.file_listbox.itemconfig(index, foreground=colors.get(status, self.colors["fg"]))
@@ -1458,7 +1950,7 @@ def main():
 ████    ████    ████████████    ████      ████
 ██████████      ████████████      ██████████
     """ + RESET)
-    print("TruTops DWG to GEO Converter")
+    print("TruTops DWG to GEO Converter v{}".format(APP_VERSION))
     print("=" * 60)
     print("Screen size: {}".format(pyautogui.size()))
     print("")

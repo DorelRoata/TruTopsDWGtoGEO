@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('d:\\Coding\\TruTopsDWGtoGEO\\d2g_custom.ico', '.')]
+datas = [('d2g_custom.ico', '.'), ('ScreenShots', 'ScreenShots')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('pynput')
@@ -42,5 +42,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['d:\\Coding\\TruTopsDWGtoGEO\\d2g_custom.ico'],
+    icon=['d2g_custom.ico'],
 )

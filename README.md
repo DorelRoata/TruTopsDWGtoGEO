@@ -4,6 +4,17 @@ A GUI automation tool that batch converts DWG files into GEO format for TrueTops
 
 **Goal**: Make the GEO process so simple that anyone can process a laser project, regardless of experience level.
 
+**Current version:** 1.2.0
+
+### Version 1.2.0 highlights
+
+- The workflow is grouped into **Load DWG** and **Create GEO** operations.
+- When TruTops does not reach the expected screen, D2G pauses instead of continuing with out-of-sequence clicks.
+- Recovery shortcuts: `Ctrl+1` Load DWG, `Ctrl+2` Create GEO, `Ctrl+3` Retry, `Ctrl+4` Skip File, and `Ctrl+5` Full File.
+- Smart waits follow visible TruTops screen changes rather than relying only on fixed delays.
+- Newly captured click locations are relative to the TruTops window and continue to work when that window moves.
+- Existing GEO handling can skip existing files, replace them, or process only DWGs newer than their GEO.
+
 ---
 
 ## Time Savings Estimate
@@ -170,6 +181,10 @@ YourProject/
 - **Simple GUI Interface** - No command-line knowledge required
 - **Batch Processing** - Process multiple DWG files automatically
 - **Reliable Button Detection** - Multiple strategies ensure buttons are always found
+- **Grouped Recovery Shortcuts** - Recover an entire Load DWG or Create GEO operation
+- **Smart UI Waiting** - Pause automatically if TruTops does not reach the next screen
+- **Window-Relative Locations** - Newly captured points follow the TruTops window
+- **Existing GEO Policy** - Skip, replace, or process only changed DWGs
 - **Progress Tracking** - Visual progress bar and file status
 - **Resume Capability** - Continue from where you left off after interruption
 - **Dry Run Mode** - Test the workflow without actually clicking
@@ -214,8 +229,10 @@ This only needs to be done once (unless TrueTops UI changes).
 3. **Start the automation**:
    - Launch `TruTopsDWGtoGEO_Final.exe`
    - Verify the file list shows your DWG files
+   - Choose how existing GEO files should be handled
    - Click **START**
-   - Don't touch the mouse/keyboard until complete
+   - Avoid normal mouse/keyboard input while a group is running
+   - If D2G pauses, use the recovery shortcut shown in the status overlay
 
 4. **Monitor progress**:
    - Watch the progress bar
@@ -395,8 +412,9 @@ If TrueTops is slow, increase the delays in `config.json`:
 ### Processing stops mid-batch
 
 1. **Check TrueTops** - May have shown an error dialog
-2. **Resume processing** - The tool saves progress, just click START again
-3. **Increase delays** - If timing issues, edit `config.json`
+2. **Use a grouped shortcut** - `Ctrl+3` retries the current group; `Ctrl+1`, `Ctrl+2`, and `Ctrl+5` can restart a larger operation
+3. **Skip a problem file** - Press `Ctrl+4` while D2G is paused
+4. **Recapture locations once** - Open Settings to convert old absolute points to window-relative points
 
 ### Files not appearing in list
 
