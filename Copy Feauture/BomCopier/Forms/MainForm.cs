@@ -5,44 +5,58 @@ namespace BomCopier.Forms
 {
     public partial class MainForm : Form
     {
+        private const string PreferSuffixMode = "Prefer FLO";
+        private const string NormalOnlyMode = "Normal only";
+        private const string SuffixOnlyMode = "FLO only";
+        private const string ShowBothMode = "Show both";
+
         private readonly ConfigService _configService;
         private readonly ExcelService _excelService;
         private readonly FileSearchService _fileSearchService;
         private readonly CopyService _copyService;
 
         private AppConfig _config;
-        private List<BomRow> _allBomRows = new();
-        private List<BomRow> _filteredRows = new();
-        private List<BomRow> _queuedFiles = new();
+        private List<BomRow> _bomRows = new();
+        private List<BomRow> _resolvedRows = new();
+        private readonly List<BomRow> _queuedFiles = new();
         private bool _bomLoaded;
+        private bool _isBusy;
 
         public MainForm()
         {
             InitializeComponent();
 
-            // Set form icon
             string iconPath = Path.Combine(AppContext.BaseDirectory, "bc_icon.ico");
             if (File.Exists(iconPath))
             {
-                this.Icon = new Icon(iconPath);
+                Icon = new Icon(iconPath);
             }
 
             _configService = new ConfigService();
             _excelService = new ExcelService();
             _fileSearchService = new FileSearchService();
             _copyService = new CopyService();
-
             _copyService.ProgressChanged += OnCopyProgressChanged;
 
             _config = _configService.Load();
 
-            // Show settings on first run
+            cmbVariant.Items.AddRange(new object[]
+            {
+                PreferSuffixMode,
+                NormalOnlyMode,
+                SuffixOnlyMode,
+                ShowBothMode
+            });
+            cmbVariant.SelectedIndex = 0;
+
             if (!_configService.ConfigExists())
             {
                 ShowSettings();
             }
 
             LoadConfigToUI();
+            SetMaterials(Array.Empty<string>());
+            UpdateActionState();
         }
 
         private void LoadConfigToUI()
@@ -61,14 +75,17 @@ namespace BomCopier.Forms
         private void ShowSettings()
         {
             using var settingsForm = new SettingsForm(_config);
-            if (settingsForm.ShowDialog() == DialogResult.OK)
+            if (settingsForm.ShowDialog() != DialogResult.OK)
             {
-                _config = settingsForm.Config;
-                // Reload BOM if one was loaded
-                if (_allBomRows.Count > 0 && !string.IsNullOrEmpty(_config.LastBomFile))
-                {
-                    LoadBomFile(_config.LastBomFile);
-                }
+                return;
+            }
+
+            _config = settingsForm.Config;
+            LoadConfigToUI();
+
+            if (_bomLoaded && !string.IsNullOrEmpty(_config.LastBomFile))
+            {
+                LoadBomFile(_config.LastBomFile);
             }
         }
 
@@ -79,22 +96,23 @@ namespace BomCopier.Forms
                 lblStatus.Text = "Loading BOM...";
                 Application.DoEvents();
 
-                _allBomRows = _excelService.LoadBom(filePath, _config);
+                _bomRows = _excelService.LoadBom(filePath, _config);
+                _resolvedRows.Clear();
+                _queuedFiles.Clear();
                 _bomLoaded = true;
                 _config.LastBomFile = filePath;
                 _configService.Save(_config);
 
-                // Populate materials dropdown
-                var materials = _excelService.GetUniqueMaterials(_allBomRows);
-                SetMaterials(materials);
+                SetMaterials(_excelService.GetUniqueMaterials(_bomRows));
+                lblStatus.Text = $"Loaded {_bomRows.Count} unique BOM part(s)";
 
-                lblStatus.Text = $"Loaded {_allBomRows.Count} items from BOM";
-                lblFileCount.Text = $"{_allBomRows.Count} items";
-
-                // Search for files if source directory is set
-                if (!string.IsNullOrWhiteSpace(txtSourceDirectory.Text))
+                if (Directory.Exists(txtSourceDirectory.Text.Trim()))
                 {
                     SearchForFiles();
+                }
+                else
+                {
+                    RefreshLists();
                 }
             }
             catch (Exception ex)
@@ -110,304 +128,326 @@ namespace BomCopier.Forms
 
         private void SetMaterials(IEnumerable<string> materials)
         {
+            cmbMaterial.BeginUpdate();
             cmbMaterial.Items.Clear();
             cmbMaterial.Items.Add("(All)");
-            foreach (var material in materials)
+            foreach (string material in materials)
             {
                 cmbMaterial.Items.Add(material);
             }
 
             cmbMaterial.SelectedIndex = 0;
-            cmbMaterial.Enabled = cmbMaterial.Items.Count > 1;
+            cmbMaterial.EndUpdate();
+            cmbMaterial.Enabled = !_isBusy && cmbMaterial.Items.Count > 1;
         }
 
         private void SearchForFiles()
         {
-            if (string.IsNullOrWhiteSpace(txtSourceDirectory.Text) || !Directory.Exists(txtSourceDirectory.Text))
+            string sourceDirectory = txtSourceDirectory.Text.Trim();
+            if (!Directory.Exists(sourceDirectory))
             {
-                lblStatus.Text = "Source directory is invalid";
+                lblStatus.Text = "Source folder is invalid";
                 return;
             }
 
-            if (!_bomLoaded)
-            {
-                LoadFilesFromDirectory();
-                return;
-            }
-
-            if (_allBomRows.Count == 0)
-            {
-                lblStatus.Text = "No BOM items loaded";
-                return;
-            }
-
-            lblStatus.Text = "Searching for files...";
+            lblStatus.Text = "Scanning source folder...";
             Application.DoEvents();
 
-            // FindFiles returns expanded list with separate entries for normal and FLO versions
-            _allBomRows = _fileSearchService.FindFiles(_allBomRows, txtSourceDirectory.Text);
-            RefreshAvailableList();
+            var queuedKeys = _queuedFiles
+                .Select(GetQueueKey)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            int found = _allBomRows.Count(r => r.IsFound);
-            int total = _allBomRows.Count;
-            lblStatus.Text = $"Found {found} of {total} file entries";
+            if (_bomLoaded)
+            {
+                if (_bomRows.Count == 0)
+                {
+                    lblStatus.Text = "No BOM items loaded";
+                    return;
+                }
+
+                _resolvedRows = _fileSearchService.FindFiles(
+                    _bomRows,
+                    sourceDirectory,
+                    _config.TargetFileExtension);
+            }
+            else
+            {
+                _resolvedRows = _fileSearchService.LoadFilesFromDirectory(
+                    sourceDirectory,
+                    _config.TargetFileExtension);
+                SetMaterials(Array.Empty<string>());
+            }
+
+            RemapQueue(queuedKeys);
+            RefreshLists();
+
+            int ready = _resolvedRows.Count(row => row.CanCopy);
+            int ambiguous = _resolvedRows.Count(row => row.IsAmbiguous);
+            lblStatus.Text = ambiguous > 0
+                ? $"Scan complete: {ready} ready, {ambiguous} duplicate-name match(es) need attention"
+                : $"Scan complete: {ready} drawing candidate(s) ready";
         }
 
-        private void LoadFilesFromDirectory()
+        private void RemapQueue(HashSet<string> queuedKeys)
         {
-            lblStatus.Text = "Scanning source folder (no BOM)...";
-            Application.DoEvents();
+            _queuedFiles.Clear();
+            foreach (BomRow row in _resolvedRows.Where(row => row.CanCopy))
+            {
+                if (queuedKeys.Contains(GetQueueKey(row)) &&
+                    !_queuedFiles.Any(queued => QueueKeysEqual(queued, row)))
+                {
+                    _queuedFiles.Add(row);
+                }
+            }
+        }
 
-            _allBomRows = _fileSearchService.LoadFilesFromDirectory(
-                txtSourceDirectory.Text,
-                _config.TargetFileExtension);
-
-            SetMaterials(Array.Empty<string>());
+        private void RefreshLists()
+        {
             RefreshAvailableList();
-
-            int total = _allBomRows.Count;
-            lblStatus.Text = total > 0
-                ? $"Found {total} file(s) (no BOM loaded)"
-                : "No files found in source folder";
-            lblFileCount.Text = $"{total} items";
+            RefreshQueueList();
         }
 
         private void RefreshAvailableList()
         {
             string selectedMaterial = cmbMaterial.SelectedItem?.ToString() ?? "(All)";
-            _filteredRows = _fileSearchService.FilterByMaterial(_allBomRows, selectedMaterial);
+            var materialRows = _fileSearchService.FilterByMaterial(_resolvedRows, selectedMaterial);
+            var displayRows = ApplyVariantFilter(materialRows);
 
-            // Apply search filter
-            string search = txtSearchAvailable.Text.Trim().ToLower();
-            var displayList = _filteredRows;
+            string search = txtSearchAvailable.Text.Trim();
             if (!string.IsNullOrEmpty(search))
             {
-                displayList = displayList.Where(r =>
-                    r.TargetFileName.ToLower().Contains(search) ||
-                    r.Material.ToLower().Contains(search)).ToList();
+                displayRows = displayRows.Where(row =>
+                    row.TargetFileName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    row.Material.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
             }
 
-            // Exclude already queued items
-            displayList = displayList.Where(r => !_queuedFiles.Contains(r)).ToList();
+            displayRows = displayRows
+                .Where(row => !_queuedFiles.Any(queued => QueueKeysEqual(queued, row)))
+                .ToList();
 
-            // Save scroll position
             int topIndex = lstAvailable.TopItem?.Index ?? 0;
-
             lstAvailable.BeginUpdate();
             lstAvailable.Items.Clear();
-            foreach (var row in displayList)
+            foreach (BomRow row in displayRows)
             {
-                var item = new ListViewItem(row.TargetFileName);
-                item.SubItems.Add(row.Quantity.ToString());
-                item.SubItems.Add(row.IsFound ? "Yes" : "No");
-                item.Tag = row;
-                item.ForeColor = row.IsFound ? Color.FromArgb(223, 230, 233) : Color.FromArgb(99, 110, 114);
-                lstAvailable.Items.Add(item);
+                lstAvailable.Items.Add(CreateListItem(row));
             }
             lstAvailable.EndUpdate();
+            RestoreTopItem(lstAvailable, topIndex);
 
-            // Restore scroll position
-            if (lstAvailable.Items.Count > 0 && topIndex > 0)
-            {
-                int newTopIndex = Math.Min(topIndex, lstAvailable.Items.Count - 1);
-                lstAvailable.TopItem = lstAvailable.Items[newTopIndex];
-            }
-
-            lblFileCount.Text = $"{displayList.Count} available, {_queuedFiles.Count} queued";
+            UpdateActionState();
         }
 
         private void RefreshQueueList()
         {
-            string search = txtSearchQueue.Text.Trim().ToLower();
-            var displayList = _queuedFiles;
-            if (!string.IsNullOrEmpty(search))
-            {
-                displayList = displayList.Where(r =>
-                    r.TargetFileName.ToLower().Contains(search)).ToList();
-            }
+            string search = txtSearchQueue.Text.Trim();
+            var displayRows = string.IsNullOrEmpty(search)
+                ? _queuedFiles.ToList()
+                : _queuedFiles.Where(row =>
+                    row.TargetFileName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    row.Material.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
 
-            // Save scroll position
             int topIndex = lstQueue.TopItem?.Index ?? 0;
-
             lstQueue.BeginUpdate();
             lstQueue.Items.Clear();
-            foreach (var row in displayList)
+            foreach (BomRow row in displayRows)
             {
-                var item = new ListViewItem(row.TargetFileName);
-                item.SubItems.Add(row.Quantity.ToString());
-                item.SubItems.Add(row.IsFound ? "Yes" : "No");
-                item.Tag = row;
-                item.ForeColor = row.IsFound ? Color.FromArgb(223, 230, 233) : Color.FromArgb(99, 110, 114);
-                lstQueue.Items.Add(item);
+                lstQueue.Items.Add(CreateListItem(row));
             }
             lstQueue.EndUpdate();
+            RestoreTopItem(lstQueue, topIndex);
 
-            // Restore scroll position
-            if (lstQueue.Items.Count > 0 && topIndex > 0)
+            UpdateActionState();
+        }
+
+        private List<BomRow> ApplyVariantFilter(List<BomRow> rows)
+        {
+            if (!_bomLoaded)
             {
-                int newTopIndex = Math.Min(topIndex, lstQueue.Items.Count - 1);
-                lstQueue.TopItem = lstQueue.Items[newTopIndex];
+                return rows;
             }
 
-            lblFileCount.Text = $"{lstAvailable.Items.Count} available, {_queuedFiles.Count} queued";
-            btnStartCopy.Enabled = _queuedFiles.Count > 0;
+            string mode = cmbVariant.SelectedItem?.ToString() ?? PreferSuffixMode;
+            if (mode == NormalOnlyMode)
+            {
+                return rows.Where(row => !row.IsSuffixVersion).ToList();
+            }
+
+            if (mode == SuffixOnlyMode)
+            {
+                return rows.Where(row => row.IsSuffixVersion).ToList();
+            }
+
+            if (mode == ShowBothMode)
+            {
+                return rows;
+            }
+
+            return rows
+                .GroupBy(GetPartKey, StringComparer.OrdinalIgnoreCase)
+                .Select(group =>
+                    group.FirstOrDefault(row => row.IsSuffixVersion && row.CanCopy) ??
+                    group.FirstOrDefault(row => !row.IsSuffixVersion && row.CanCopy) ??
+                    group.FirstOrDefault(row => row.IsSuffixVersion && row.IsAmbiguous) ??
+                    group.FirstOrDefault(row => !row.IsSuffixVersion && row.IsAmbiguous) ??
+                    group.First())
+                .ToList();
+        }
+
+        private ListViewItem CreateListItem(BomRow row)
+        {
+            var item = new ListViewItem(row.TargetFileName);
+            item.SubItems.Add(row.Quantity.ToString());
+            item.SubItems.Add(row.IsSuffixVersion ? _config.FilenameSuffix : "Normal");
+            item.SubItems.Add(GetStatusText(row));
+            item.Tag = row;
+            item.ForeColor = row.CanCopy
+                ? Color.FromArgb(223, 230, 233)
+                : row.IsAmbiguous
+                    ? Color.FromArgb(235, 176, 95)
+                    : Color.FromArgb(110, 120, 130);
+            return item;
+        }
+
+        private static string GetStatusText(BomRow row)
+        {
+            if (row.IsAmbiguous)
+            {
+                return $"Duplicate ({row.MatchCount})";
+            }
+
+            return row.IsFound ? "Ready" : "Missing";
         }
 
         private void AddSelectedToQueue()
         {
-            foreach (ListViewItem item in lstAvailable.SelectedItems)
-            {
-                if (item.Tag is BomRow row && !_queuedFiles.Contains(row))
-                {
-                    _queuedFiles.Add(row);
-                }
-            }
-            RefreshAvailableList();
-            RefreshQueueList();
+            AddItemsToQueue(lstAvailable.SelectedItems.Cast<ListViewItem>());
         }
 
         private void AddAllToQueue()
         {
-            foreach (ListViewItem item in lstAvailable.Items)
+            AddItemsToQueue(lstAvailable.Items.Cast<ListViewItem>());
+        }
+
+        private void AddItemsToQueue(IEnumerable<ListViewItem> items)
+        {
+            int added = 0;
+            int unavailable = 0;
+
+            foreach (BomRow row in items.Select(item => item.Tag).OfType<BomRow>().ToList())
             {
-                if (item.Tag is BomRow row && !_queuedFiles.Contains(row))
+                if (!row.CanCopy)
                 {
-                    _queuedFiles.Add(row);
+                    unavailable++;
+                    continue;
                 }
+
+                if (_queuedFiles.Any(queued => QueueKeysEqual(queued, row)))
+                {
+                    continue;
+                }
+
+                _queuedFiles.Add(row);
+                added++;
             }
-            RefreshAvailableList();
-            RefreshQueueList();
+
+            RefreshLists();
+            if (unavailable > 0)
+            {
+                lblStatus.Text = $"Added {added}; skipped {unavailable} missing or duplicate-name item(s)";
+            }
+            else if (added > 0)
+            {
+                lblStatus.Text = $"Added {added} drawing(s) to the copy queue";
+            }
         }
 
         private void RemoveSelectedFromQueue()
         {
-            var toRemove = new List<BomRow>();
-            foreach (ListViewItem item in lstQueue.SelectedItems)
-            {
-                if (item.Tag is BomRow row)
-                {
-                    toRemove.Add(row);
-                }
-            }
-            foreach (var row in toRemove)
+            var toRemove = lstQueue.SelectedItems
+                .Cast<ListViewItem>()
+                .Select(item => item.Tag)
+                .OfType<BomRow>()
+                .ToList();
+
+            foreach (BomRow row in toRemove)
             {
                 _queuedFiles.Remove(row);
             }
-            RefreshAvailableList();
-            RefreshQueueList();
+
+            RefreshLists();
+            if (toRemove.Count > 0)
+            {
+                lblStatus.Text = $"Removed {toRemove.Count} drawing(s) from the queue";
+            }
         }
 
         private void ClearQueue()
         {
             _queuedFiles.Clear();
-            RefreshAvailableList();
-            RefreshQueueList();
-        }
-
-        private void FilterFloOnly()
-        {
-            if (_queuedFiles.Count == 0)
-                return;
-
-            // Get suffix from config (default "FLO")
-            string suffix = _config.FilenameSuffix;
-
-            // Find all base names that have a FLO version in the queue
-            var floFiles = _queuedFiles
-                .Where(r => r.IsSuffixVersion)
-                .ToList();
-
-            // Get the base names of FLO files (without the suffix)
-            var floBaseNames = floFiles
-                .Select(r => r.NormalFileName.ToLowerInvariant())
-                .ToHashSet();
-
-            // Remove non-FLO files that have a matching FLO version
-            var toRemove = _queuedFiles
-                .Where(r => !r.IsSuffixVersion && floBaseNames.Contains(r.TargetFileName.ToLowerInvariant()))
-                .ToList();
-
-            foreach (var row in toRemove)
-            {
-                _queuedFiles.Remove(row);
-            }
-
-            RefreshAvailableList();
-            RefreshQueueList();
-
-            lblStatus.Text = $"Removed {toRemove.Count} non-FLO files (FLO versions exist)";
+            RefreshLists();
+            lblStatus.Text = "Copy queue cleared";
         }
 
         private async void StartCopy()
         {
             if (_queuedFiles.Count == 0)
             {
-                MessageBox.Show("No files in queue.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("No files in the copy queue.", "BOM Copier", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(txtTargetDirectory.Text))
+            string targetDirectory = txtTargetDirectory.Text.Trim();
+            if (string.IsNullOrWhiteSpace(targetDirectory))
             {
-                MessageBox.Show("Please select a target directory.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Select a copy folder first.", "Copy Folder Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // Only copy files that were found
-            var filesToCopy = _queuedFiles.Where(r => r.IsFound).ToList();
-            int notFound = _queuedFiles.Count - filesToCopy.Count;
-
-            if (filesToCopy.Count == 0)
-            {
-                MessageBox.Show("None of the queued files were found in the source directory.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            string message = $"Copy {filesToCopy.Count} file(s) to:\n{txtTargetDirectory.Text}";
-            if (notFound > 0)
-            {
-                message += $"\n\n({notFound} files will be skipped - not found)";
-            }
-
+            var filesToCopy = _queuedFiles.Where(row => row.CanCopy).ToList();
+            string message = $"Copy {filesToCopy.Count} drawing(s) to:\n\n{targetDirectory}";
             if (MessageBox.Show(message, "Confirm Copy", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
             {
                 return;
             }
 
-            // Disable UI during copy
             SetUIEnabled(false);
             progressBar.Value = 0;
-            progressBar.Maximum = filesToCopy.Count;
+            progressBar.Maximum = Math.Max(1, filesToCopy.Count);
 
             try
             {
                 SaveDirectoriesToConfig();
+                CopyResult result = await Task.Run(() =>
+                    _copyService.CopyFiles(filesToCopy, targetDirectory, _config.OverwriteExisting));
 
-                var result = await Task.Run(() =>
-                    _copyService.CopyFiles(filesToCopy, txtTargetDirectory.Text, _config.OverwriteExisting));
+                foreach (BomRow copiedFile in result.CopiedFiles)
+                {
+                    _queuedFiles.Remove(copiedFile);
+                }
 
-                // Show summary
-                string summary = $"Copy Complete!\n\n" +
+                RefreshLists();
+
+                string summary = $"Copy complete.\n\n" +
                     $"Copied: {result.Copied}\n" +
                     $"Skipped: {result.Skipped}\n" +
-                    $"Errors: {result.Errors}";
+                    $"Errors: {result.Errors}\n" +
+                    $"Remaining in queue: {_queuedFiles.Count}";
 
-                if (result.Errors > 0 && result.ErrorMessages.Count > 0)
+                if (result.ErrorMessages.Count > 0)
                 {
-                    summary += "\n\nErrors:\n" + string.Join("\n", result.ErrorMessages.Take(5));
+                    summary += "\n\n" + string.Join("\n", result.ErrorMessages.Take(5));
                     if (result.ErrorMessages.Count > 5)
                     {
-                        summary += $"\n... and {result.ErrorMessages.Count - 5} more (see log.txt)";
+                        summary += $"\n...and {result.ErrorMessages.Count - 5} more (see log.txt)";
                     }
                 }
 
-                MessageBox.Show(summary, "Copy Complete", MessageBoxButtons.OK,
+                MessageBox.Show(
+                    summary,
+                    "Copy Complete",
+                    MessageBoxButtons.OK,
                     result.Errors > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
-
-                // Clear queue on success
-                if (result.Errors == 0)
-                {
-                    ClearQueue();
-                }
 
                 lblStatus.Text = $"Copy complete: {result.Copied} copied, {result.Skipped} skipped, {result.Errors} errors";
             }
@@ -431,29 +471,72 @@ namespace BomCopier.Forms
                 return;
             }
 
-            progressBar.Maximum = total;
-            progressBar.Value = current;
+            progressBar.Maximum = Math.Max(1, total);
+            progressBar.Value = Math.Min(current, progressBar.Maximum);
             lblStatus.Text = $"Copying {current}/{total}: {fileName}";
         }
 
         private void SetUIEnabled(bool enabled)
         {
+            _isBusy = !enabled;
             btnLoadBom.Enabled = enabled;
             btnSettings.Enabled = enabled;
             btnBrowseSource.Enabled = enabled;
+            btnScanSource.Enabled = enabled;
             btnBrowseTarget.Enabled = enabled;
-            btnAdd.Enabled = enabled;
-            btnAddAll.Enabled = enabled;
-            btnRemove.Enabled = enabled;
-            btnClearQueue.Enabled = enabled;
-            btnFloOnly.Enabled = enabled;
-            btnStartCopy.Enabled = enabled && _queuedFiles.Count > 0;
-            cmbMaterial.Enabled = enabled;
+            txtSourceDirectory.Enabled = enabled;
+            txtTargetDirectory.Enabled = enabled;
+            cmbMaterial.Enabled = enabled && cmbMaterial.Items.Count > 1;
+            cmbVariant.Enabled = enabled && _bomLoaded;
+            txtSearchAvailable.Enabled = enabled;
+            txtSearchQueue.Enabled = enabled;
             lstAvailable.Enabled = enabled;
             lstQueue.Enabled = enabled;
+            UpdateActionState();
         }
 
-        // Event Handlers
+        private void UpdateActionState()
+        {
+            int availableCount = lstAvailable.Items.Count;
+            lblFileCount.Text = $"{availableCount} available | {_queuedFiles.Count} queued";
+            lblQueue.Text = $"Copy Queue ({_queuedFiles.Count})";
+
+            btnAdd.Enabled = !_isBusy && lstAvailable.SelectedItems.Cast<ListViewItem>()
+                .Any(item => item.Tag is BomRow row && row.CanCopy);
+            btnAddAll.Enabled = !_isBusy && lstAvailable.Items.Cast<ListViewItem>()
+                .Any(item => item.Tag is BomRow row && row.CanCopy);
+            btnRemove.Enabled = !_isBusy && lstQueue.SelectedItems.Count > 0;
+            btnClearQueue.Enabled = !_isBusy && _queuedFiles.Count > 0;
+            btnStartCopy.Enabled = !_isBusy && _queuedFiles.Count > 0;
+            btnStartCopy.Text = _queuedFiles.Count == 1
+                ? "Copy 1 File"
+                : $"Copy {_queuedFiles.Count} Files";
+        }
+
+        private static void RestoreTopItem(ListView listView, int previousTopIndex)
+        {
+            if (listView.Items.Count > 0 && previousTopIndex > 0)
+            {
+                listView.TopItem = listView.Items[Math.Min(previousTopIndex, listView.Items.Count - 1)];
+            }
+        }
+
+        private static string GetPartKey(BomRow row) => row.NormalFileName + "\0" + row.Material;
+
+        private static string GetQueueKey(BomRow row) => row.TargetFileName + "\0" + row.Material;
+
+        private static bool QueueKeysEqual(BomRow left, BomRow right) =>
+            GetQueueKey(left).Equals(GetQueueKey(right), StringComparison.OrdinalIgnoreCase);
+
+        private static void SelectAllItems(ListView listView)
+        {
+            listView.BeginUpdate();
+            foreach (ListViewItem item in listView.Items)
+            {
+                item.Selected = true;
+            }
+            listView.EndUpdate();
+        }
 
         private void btnLoadBom_Click(object sender, EventArgs e)
         {
@@ -463,9 +546,10 @@ namespace BomCopier.Forms
                 Title = "Select BOM File"
             };
 
-            if (!string.IsNullOrEmpty(_config.LastBomFile))
+            string? lastDirectory = Path.GetDirectoryName(_config.LastBomFile);
+            if (!string.IsNullOrEmpty(lastDirectory) && Directory.Exists(lastDirectory))
             {
-                dialog.InitialDirectory = Path.GetDirectoryName(_config.LastBomFile);
+                dialog.InitialDirectory = lastDirectory;
             }
 
             if (dialog.ShowDialog() == DialogResult.OK)
@@ -474,23 +558,16 @@ namespace BomCopier.Forms
             }
         }
 
-        private void btnSettings_Click(object sender, EventArgs e)
-        {
-            ShowSettings();
-        }
+        private void btnSettings_Click(object sender, EventArgs e) => ShowSettings();
 
         private void btnBrowseSource_Click(object sender, EventArgs e)
         {
             using var dialog = new FolderBrowserDialog
             {
-                Description = "Select Source Directory",
-                ShowNewFolderButton = false
+                Description = "Select the folder containing DWG files",
+                ShowNewFolderButton = false,
+                SelectedPath = Directory.Exists(txtSourceDirectory.Text) ? txtSourceDirectory.Text : string.Empty
             };
-
-            if (!string.IsNullOrEmpty(txtSourceDirectory.Text) && Directory.Exists(txtSourceDirectory.Text))
-            {
-                dialog.SelectedPath = txtSourceDirectory.Text;
-            }
 
             if (dialog.ShowDialog() == DialogResult.OK)
             {
@@ -500,18 +577,20 @@ namespace BomCopier.Forms
             }
         }
 
+        private void btnScanSource_Click(object sender, EventArgs e)
+        {
+            SaveDirectoriesToConfig();
+            SearchForFiles();
+        }
+
         private void btnBrowseTarget_Click(object sender, EventArgs e)
         {
             using var dialog = new FolderBrowserDialog
             {
-                Description = "Select Target Directory",
-                ShowNewFolderButton = true
+                Description = "Select the copy destination for this batch",
+                ShowNewFolderButton = true,
+                SelectedPath = Directory.Exists(txtTargetDirectory.Text) ? txtTargetDirectory.Text : string.Empty
             };
-
-            if (!string.IsNullOrEmpty(txtTargetDirectory.Text) && Directory.Exists(txtTargetDirectory.Text))
-            {
-                dialog.SelectedPath = txtTargetDirectory.Text;
-            }
 
             if (dialog.ShowDialog() == DialogResult.OK)
             {
@@ -520,101 +599,83 @@ namespace BomCopier.Forms
             }
         }
 
-        private void cmbMaterial_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            RefreshAvailableList();
-        }
+        private void cmbMaterial_SelectedIndexChanged(object sender, EventArgs e) => RefreshAvailableList();
 
-        private void txtSearchAvailable_TextChanged(object sender, EventArgs e)
-        {
-            RefreshAvailableList();
-        }
+        private void cmbVariant_SelectedIndexChanged(object sender, EventArgs e) => RefreshAvailableList();
 
-        private void txtSearchQueue_TextChanged(object sender, EventArgs e)
-        {
-            RefreshQueueList();
-        }
+        private void txtSearchAvailable_TextChanged(object sender, EventArgs e) => RefreshAvailableList();
 
-        private void btnAdd_Click(object sender, EventArgs e)
-        {
-            AddSelectedToQueue();
-        }
+        private void txtSearchQueue_TextChanged(object sender, EventArgs e) => RefreshQueueList();
 
-        private void btnAddAll_Click(object sender, EventArgs e)
-        {
-            AddAllToQueue();
-        }
+        private void lstAvailable_SelectedIndexChanged(object sender, EventArgs e) => UpdateActionState();
 
-        private void btnRemove_Click(object sender, EventArgs e)
-        {
-            RemoveSelectedFromQueue();
-        }
+        private void lstQueue_SelectedIndexChanged(object sender, EventArgs e) => UpdateActionState();
 
-        private void btnClearQueue_Click(object sender, EventArgs e)
-        {
-            ClearQueue();
-        }
+        private void btnAdd_Click(object sender, EventArgs e) => AddSelectedToQueue();
 
-        private void btnFloOnly_Click(object sender, EventArgs e)
-        {
-            FilterFloOnly();
-        }
+        private void btnAddAll_Click(object sender, EventArgs e) => AddAllToQueue();
 
-        private void btnStartCopy_Click(object sender, EventArgs e)
-        {
-            StartCopy();
-        }
+        private void btnRemove_Click(object sender, EventArgs e) => RemoveSelectedFromQueue();
 
-        private void lstAvailable_DoubleClick(object sender, EventArgs e)
-        {
-            AddSelectedToQueue();
-        }
+        private void btnClearQueue_Click(object sender, EventArgs e) => ClearQueue();
 
-        private void lstQueue_DoubleClick(object sender, EventArgs e)
-        {
-            RemoveSelectedFromQueue();
-        }
+        private void btnStartCopy_Click(object sender, EventArgs e) => StartCopy();
+
+        private void lstAvailable_DoubleClick(object sender, EventArgs e) => AddSelectedToQueue();
+
+        private void lstQueue_DoubleClick(object sender, EventArgs e) => RemoveSelectedFromQueue();
 
         private void lstAvailable_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Enter)
+            if (e.Control && e.KeyCode == Keys.A)
+            {
+                SelectAllItems(lstAvailable);
+                e.SuppressKeyPress = true;
+            }
+            else if (e.KeyCode == Keys.Enter)
             {
                 AddSelectedToQueue();
-                e.Handled = true;
+                e.SuppressKeyPress = true;
             }
         }
 
         private void lstQueue_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Delete)
+            if (e.Control && e.KeyCode == Keys.A)
+            {
+                SelectAllItems(lstQueue);
+                e.SuppressKeyPress = true;
+            }
+            else if (e.KeyCode == Keys.Delete)
             {
                 RemoveSelectedFromQueue();
-                e.Handled = true;
+                e.SuppressKeyPress = true;
             }
         }
 
-        // Drag and drop support
         private void MainForm_DragEnter(object sender, DragEventArgs e)
         {
             if (e.Data?.GetDataPresent(DataFormats.FileDrop) == true)
             {
                 var files = (string[]?)e.Data.GetData(DataFormats.FileDrop);
-                if (files?.Any(f => f.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ||
-                                    f.EndsWith(".xls", StringComparison.OrdinalIgnoreCase)) == true)
+                if (files?.Any(file =>
+                    file.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ||
+                    file.EndsWith(".xls", StringComparison.OrdinalIgnoreCase)) == true)
                 {
                     e.Effect = DragDropEffects.Copy;
                     return;
                 }
             }
+
             e.Effect = DragDropEffects.None;
         }
 
         private void MainForm_DragDrop(object sender, DragEventArgs e)
         {
             var files = (string[]?)e.Data?.GetData(DataFormats.FileDrop);
-            var excelFile = files?.FirstOrDefault(f =>
-                f.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ||
-                f.EndsWith(".xls", StringComparison.OrdinalIgnoreCase));
+            string? excelFile = files?.FirstOrDefault(file =>
+                file.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ||
+                file.EndsWith(".xls", StringComparison.OrdinalIgnoreCase));
 
             if (excelFile != null)
             {

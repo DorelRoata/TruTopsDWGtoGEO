@@ -6,7 +6,7 @@ namespace BomCopier.Forms
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing && (components != null))
+            if (disposing && components != null)
             {
                 components.Dispose();
             }
@@ -18,557 +18,311 @@ namespace BomCopier.Forms
         private void InitializeComponent()
         {
             pnlTop = new Panel();
-            lblFileCount = new Label();
-            cmbMaterial = new ComboBox();
-            lblMaterial = new Label();
-            btnSettings = new Button();
             btnLoadBom = new Button();
+            lblMaterial = new Label();
+            cmbMaterial = new ComboBox();
+            lblVariant = new Label();
+            cmbVariant = new ComboBox();
+            lblFileCount = new Label();
+            btnSettings = new Button();
             pnlDirectories = new Panel();
-            btnBrowseTarget = new Button();
-            txtTargetDirectory = new TextBox();
-            lblTarget = new Label();
-            btnBrowseSource = new Button();
-            txtSourceDirectory = new TextBox();
             lblSource = new Label();
+            txtSourceDirectory = new TextBox();
+            btnBrowseSource = new Button();
+            btnScanSource = new Button();
+            lblTarget = new Label();
+            txtTargetDirectory = new TextBox();
+            btnBrowseTarget = new Button();
             pnlMain = new Panel();
+            tableMain = new TableLayoutPanel();
             pnlAvailable = new Panel();
+            tableAvailable = new TableLayoutPanel();
+            lblAvailable = new Label();
+            lblAvailableHelp = new Label();
+            txtSearchAvailable = new TextBox();
             lstAvailable = new ListView();
             colAvailableName = new ColumnHeader();
             colAvailableQty = new ColumnHeader();
-            colAvailableFound = new ColumnHeader();
-            txtSearchAvailable = new TextBox();
-            lblAvailable = new Label();
-            pnlButtons = new Panel();
-            btnAddAll = new Button();
+            colAvailableVariant = new ColumnHeader();
+            colAvailableStatus = new ColumnHeader();
+            pnlButtons = new FlowLayoutPanel();
             btnAdd = new Button();
+            btnAddAll = new Button();
             btnRemove = new Button();
             btnClearQueue = new Button();
-            btnFloOnly = new Button();
             pnlQueue = new Panel();
+            tableQueue = new TableLayoutPanel();
+            lblQueue = new Label();
+            lblQueueHelp = new Label();
+            txtSearchQueue = new TextBox();
             lstQueue = new ListView();
             colQueueName = new ColumnHeader();
             colQueueQty = new ColumnHeader();
-            colQueueFound = new ColumnHeader();
-            txtSearchQueue = new TextBox();
-            lblQueue = new Label();
+            colQueueVariant = new ColumnHeader();
+            colQueueStatus = new ColumnHeader();
             pnlBottom = new Panel();
-            btnStartCopy = new Button();
-            lblStatus = new Label();
             progressBar = new ProgressBar();
+            lblStatus = new Label();
+            btnStartCopy = new Button();
             pnlTop.SuspendLayout();
             pnlDirectories.SuspendLayout();
             pnlMain.SuspendLayout();
+            tableMain.SuspendLayout();
             pnlAvailable.SuspendLayout();
+            tableAvailable.SuspendLayout();
             pnlButtons.SuspendLayout();
             pnlQueue.SuspendLayout();
+            tableQueue.SuspendLayout();
             pnlBottom.SuspendLayout();
             SuspendLayout();
-            //
-            // pnlTop - Header panel with smoky glass effect
-            //
+
+            // Header
             pnlTop.BackColor = Color.FromArgb(25, 25, 30);
-            pnlTop.Controls.Add(lblFileCount);
-            pnlTop.Controls.Add(cmbMaterial);
-            pnlTop.Controls.Add(lblMaterial);
-            pnlTop.Controls.Add(btnSettings);
             pnlTop.Controls.Add(btnLoadBom);
+            pnlTop.Controls.Add(lblMaterial);
+            pnlTop.Controls.Add(cmbMaterial);
+            pnlTop.Controls.Add(lblVariant);
+            pnlTop.Controls.Add(cmbVariant);
+            pnlTop.Controls.Add(lblFileCount);
+            pnlTop.Controls.Add(btnSettings);
             pnlTop.Dock = DockStyle.Top;
-            pnlTop.Location = new Point(0, 0);
-            pnlTop.Name = "pnlTop";
+            pnlTop.Height = 62;
             pnlTop.Padding = new Padding(12);
-            pnlTop.Size = new Size(950, 55);
-            pnlTop.TabIndex = 0;
-            //
-            // lblFileCount
-            //
-            lblFileCount.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            lblFileCount.Font = new Font("Iosevka", 9F, FontStyle.Italic);
-            lblFileCount.ForeColor = Color.FromArgb(140, 150, 160);
-            lblFileCount.Location = new Point(720, 18);
-            lblFileCount.Name = "lblFileCount";
-            lblFileCount.Size = new Size(130, 20);
-            lblFileCount.TabIndex = 4;
-            lblFileCount.Text = "0 items";
-            lblFileCount.TextAlign = ContentAlignment.MiddleRight;
-            //
-            // cmbMaterial
-            //
-            cmbMaterial.BackColor = Color.FromArgb(35, 38, 45);
-            cmbMaterial.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbMaterial.FlatStyle = FlatStyle.Flat;
-            cmbMaterial.Font = new Font("Iosevka", 9F);
-            cmbMaterial.ForeColor = Color.FromArgb(200, 210, 220);
-            cmbMaterial.FormattingEnabled = true;
-            cmbMaterial.Location = new Point(290, 14);
-            cmbMaterial.Name = "cmbMaterial";
-            cmbMaterial.Size = new Size(280, 28);
-            cmbMaterial.TabIndex = 3;
-            cmbMaterial.SelectedIndexChanged += cmbMaterial_SelectedIndexChanged;
-            //
-            // lblMaterial
-            //
-            lblMaterial.AutoSize = true;
-            lblMaterial.Font = new Font("Iosevka", 9F);
-            lblMaterial.ForeColor = Color.FromArgb(180, 190, 200);
-            lblMaterial.Location = new Point(220, 17);
-            lblMaterial.Name = "lblMaterial";
-            lblMaterial.Size = new Size(64, 20);
-            lblMaterial.TabIndex = 2;
-            lblMaterial.Text = "Material:";
-            //
-            // btnSettings
-            //
-            btnSettings.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnSettings.BackColor = Color.FromArgb(50, 55, 65);
-            btnSettings.Cursor = Cursors.Hand;
-            btnSettings.FlatAppearance.BorderColor = Color.FromArgb(70, 80, 95);
-            btnSettings.FlatAppearance.BorderSize = 1;
-            btnSettings.FlatAppearance.MouseOverBackColor = Color.FromArgb(65, 70, 85);
-            btnSettings.FlatStyle = FlatStyle.Flat;
-            btnSettings.Font = new Font("Iosevka", 9F);
-            btnSettings.ForeColor = Color.FromArgb(180, 190, 200);
-            btnSettings.Location = new Point(856, 12);
-            btnSettings.Name = "btnSettings";
-            btnSettings.Size = new Size(80, 32);
-            btnSettings.TabIndex = 1;
-            btnSettings.Text = "Settings";
-            btnSettings.UseVisualStyleBackColor = false;
-            btnSettings.Click += btnSettings_Click;
-            //
-            // btnLoadBom
-            //
-            btnLoadBom.BackColor = Color.FromArgb(45, 90, 130);
-            btnLoadBom.Cursor = Cursors.Hand;
-            btnLoadBom.FlatAppearance.BorderColor = Color.FromArgb(60, 110, 155);
-            btnLoadBom.FlatAppearance.BorderSize = 1;
-            btnLoadBom.FlatAppearance.MouseOverBackColor = Color.FromArgb(55, 105, 150);
-            btnLoadBom.FlatStyle = FlatStyle.Flat;
-            btnLoadBom.Font = new Font("Iosevka", 9F, FontStyle.Bold);
-            btnLoadBom.ForeColor = Color.FromArgb(220, 230, 240);
-            btnLoadBom.Location = new Point(12, 12);
-            btnLoadBom.Name = "btnLoadBom";
-            btnLoadBom.Size = new Size(110, 32);
-            btnLoadBom.TabIndex = 0;
+
+            ConfigureButton(btnLoadBom, Color.FromArgb(45, 90, 130), Color.FromArgb(220, 230, 240));
+            btnLoadBom.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            btnLoadBom.Location = new Point(12, 14);
+            btnLoadBom.Size = new Size(120, 34);
             btnLoadBom.Text = "Load BOM";
-            btnLoadBom.UseVisualStyleBackColor = false;
             btnLoadBom.Click += btnLoadBom_Click;
-            //
-            // pnlDirectories - Directory selection with glass border
-            //
+
+            ConfigureLabel(lblMaterial, "Material:");
+            lblMaterial.Location = new Point(152, 21);
+            lblMaterial.AutoSize = true;
+
+            ConfigureComboBox(cmbMaterial);
+            cmbMaterial.Location = new Point(220, 17);
+            cmbMaterial.Size = new Size(215, 28);
+            cmbMaterial.SelectedIndexChanged += cmbMaterial_SelectedIndexChanged;
+
+            ConfigureLabel(lblVariant, "Variant:");
+            lblVariant.Location = new Point(455, 21);
+            lblVariant.AutoSize = true;
+
+            ConfigureComboBox(cmbVariant);
+            cmbVariant.Location = new Point(515, 17);
+            cmbVariant.Size = new Size(165, 28);
+            cmbVariant.SelectedIndexChanged += cmbVariant_SelectedIndexChanged;
+
+            lblFileCount.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            lblFileCount.Font = new Font("Segoe UI", 9F, FontStyle.Italic);
+            lblFileCount.ForeColor = Color.FromArgb(140, 150, 160);
+            lblFileCount.Location = new Point(836, 21);
+            lblFileCount.Size = new Size(220, 20);
+            lblFileCount.Text = "0 available | 0 queued";
+            lblFileCount.TextAlign = ContentAlignment.MiddleRight;
+
+            ConfigureButton(btnSettings, Color.FromArgb(50, 55, 65), Color.FromArgb(190, 200, 210));
+            btnSettings.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnSettings.Location = new Point(1070, 14);
+            btnSettings.Size = new Size(96, 34);
+            btnSettings.Text = "Settings";
+            btnSettings.Click += btnSettings_Click;
+
+            // Directories
             pnlDirectories.BackColor = Color.FromArgb(28, 30, 35);
-            pnlDirectories.Controls.Add(btnBrowseTarget);
-            pnlDirectories.Controls.Add(txtTargetDirectory);
-            pnlDirectories.Controls.Add(lblTarget);
-            pnlDirectories.Controls.Add(btnBrowseSource);
-            pnlDirectories.Controls.Add(txtSourceDirectory);
             pnlDirectories.Controls.Add(lblSource);
+            pnlDirectories.Controls.Add(txtSourceDirectory);
+            pnlDirectories.Controls.Add(btnBrowseSource);
+            pnlDirectories.Controls.Add(btnScanSource);
+            pnlDirectories.Controls.Add(lblTarget);
+            pnlDirectories.Controls.Add(txtTargetDirectory);
+            pnlDirectories.Controls.Add(btnBrowseTarget);
             pnlDirectories.Dock = DockStyle.Top;
-            pnlDirectories.Location = new Point(0, 55);
-            pnlDirectories.Name = "pnlDirectories";
-            pnlDirectories.Padding = new Padding(12, 8, 12, 8);
-            pnlDirectories.Size = new Size(950, 75);
-            pnlDirectories.TabIndex = 1;
-            //
-            // btnBrowseTarget
-            //
-            btnBrowseTarget.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnBrowseTarget.BackColor = Color.FromArgb(50, 55, 65);
-            btnBrowseTarget.Cursor = Cursors.Hand;
-            btnBrowseTarget.FlatAppearance.BorderColor = Color.FromArgb(70, 80, 95);
-            btnBrowseTarget.FlatAppearance.MouseOverBackColor = Color.FromArgb(65, 70, 85);
-            btnBrowseTarget.FlatStyle = FlatStyle.Flat;
-            btnBrowseTarget.Font = new Font("Iosevka", 9F);
-            btnBrowseTarget.ForeColor = Color.FromArgb(180, 190, 200);
-            btnBrowseTarget.Location = new Point(878, 40);
-            btnBrowseTarget.Name = "btnBrowseTarget";
-            btnBrowseTarget.Size = new Size(58, 27);
-            btnBrowseTarget.TabIndex = 5;
-            btnBrowseTarget.Text = "...";
-            btnBrowseTarget.UseVisualStyleBackColor = false;
-            btnBrowseTarget.Click += btnBrowseTarget_Click;
-            //
-            // txtTargetDirectory
-            //
-            txtTargetDirectory.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            txtTargetDirectory.BackColor = Color.FromArgb(35, 38, 45);
-            txtTargetDirectory.BorderStyle = BorderStyle.FixedSingle;
-            txtTargetDirectory.Font = new Font("Iosevka", 9F);
-            txtTargetDirectory.ForeColor = Color.FromArgb(200, 210, 220);
-            txtTargetDirectory.Location = new Point(120, 40);
-            txtTargetDirectory.Name = "txtTargetDirectory";
-            txtTargetDirectory.Size = new Size(752, 27);
-            txtTargetDirectory.TabIndex = 4;
-            //
-            // lblTarget
-            //
-            lblTarget.AutoSize = true;
-            lblTarget.Font = new Font("Iosevka", 9F);
-            lblTarget.ForeColor = Color.FromArgb(180, 190, 200);
-            lblTarget.Location = new Point(12, 43);
-            lblTarget.Name = "lblTarget";
-            lblTarget.Size = new Size(92, 20);
-            lblTarget.TabIndex = 3;
-            lblTarget.Text = "Copy Folder:";
-            //
-            // btnBrowseSource
-            //
-            btnBrowseSource.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnBrowseSource.BackColor = Color.FromArgb(50, 55, 65);
-            btnBrowseSource.Cursor = Cursors.Hand;
-            btnBrowseSource.FlatAppearance.BorderColor = Color.FromArgb(70, 80, 95);
-            btnBrowseSource.FlatAppearance.MouseOverBackColor = Color.FromArgb(65, 70, 85);
-            btnBrowseSource.FlatStyle = FlatStyle.Flat;
-            btnBrowseSource.Font = new Font("Iosevka", 9F);
-            btnBrowseSource.ForeColor = Color.FromArgb(180, 190, 200);
-            btnBrowseSource.Location = new Point(878, 8);
-            btnBrowseSource.Name = "btnBrowseSource";
-            btnBrowseSource.Size = new Size(58, 27);
-            btnBrowseSource.TabIndex = 2;
-            btnBrowseSource.Text = "...";
-            btnBrowseSource.UseVisualStyleBackColor = false;
-            btnBrowseSource.Click += btnBrowseSource_Click;
-            //
-            // txtSourceDirectory
-            //
-            txtSourceDirectory.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            txtSourceDirectory.BackColor = Color.FromArgb(35, 38, 45);
-            txtSourceDirectory.BorderStyle = BorderStyle.FixedSingle;
-            txtSourceDirectory.Font = new Font("Iosevka", 9F);
-            txtSourceDirectory.ForeColor = Color.FromArgb(200, 210, 220);
-            txtSourceDirectory.Location = new Point(120, 8);
-            txtSourceDirectory.Name = "txtSourceDirectory";
-            txtSourceDirectory.Size = new Size(752, 27);
-            txtSourceDirectory.TabIndex = 1;
-            //
-            // lblSource
-            //
+            pnlDirectories.Height = 88;
+
+            ConfigureLabel(lblSource, "Source folder:");
+            lblSource.Location = new Point(12, 15);
             lblSource.AutoSize = true;
-            lblSource.Font = new Font("Iosevka", 9F);
-            lblSource.ForeColor = Color.FromArgb(180, 190, 200);
-            lblSource.Location = new Point(12, 11);
-            lblSource.Name = "lblSource";
-            lblSource.Size = new Size(100, 20);
-            lblSource.TabIndex = 0;
-            lblSource.Text = "Source Folder:";
-            //
-            // pnlMain - Main content area
-            //
-            pnlMain.BackColor = Color.FromArgb(20, 22, 26);
-            pnlMain.Controls.Add(pnlQueue);
-            pnlMain.Controls.Add(pnlButtons);
-            pnlMain.Controls.Add(pnlAvailable);
+
+            ConfigurePathTextBox(txtSourceDirectory);
+            txtSourceDirectory.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            txtSourceDirectory.Location = new Point(120, 11);
+            txtSourceDirectory.Size = new Size(842, 27);
+
+            ConfigureButton(btnBrowseSource, Color.FromArgb(50, 55, 65), Color.FromArgb(190, 200, 210));
+            btnBrowseSource.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnBrowseSource.Location = new Point(970, 10);
+            btnBrowseSource.Size = new Size(92, 30);
+            btnBrowseSource.Text = "Browse...";
+            btnBrowseSource.Click += btnBrowseSource_Click;
+
+            ConfigureButton(btnScanSource, Color.FromArgb(50, 75, 95), Color.FromArgb(205, 220, 230));
+            btnScanSource.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnScanSource.Location = new Point(1070, 10);
+            btnScanSource.Size = new Size(96, 30);
+            btnScanSource.Text = "Scan";
+            btnScanSource.Click += btnScanSource_Click;
+
+            ConfigureLabel(lblTarget, "Copy folder:");
+            lblTarget.Location = new Point(12, 52);
+            lblTarget.AutoSize = true;
+
+            ConfigurePathTextBox(txtTargetDirectory);
+            txtTargetDirectory.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            txtTargetDirectory.Location = new Point(120, 48);
+            txtTargetDirectory.Size = new Size(942, 27);
+
+            ConfigureButton(btnBrowseTarget, Color.FromArgb(50, 55, 65), Color.FromArgb(190, 200, 210));
+            btnBrowseTarget.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnBrowseTarget.Location = new Point(1070, 47);
+            btnBrowseTarget.Size = new Size(96, 30);
+            btnBrowseTarget.Text = "Browse...";
+            btnBrowseTarget.Click += btnBrowseTarget_Click;
+
+            // Main area
+            pnlMain.BackColor = Color.FromArgb(18, 20, 24);
+            pnlMain.Controls.Add(tableMain);
             pnlMain.Dock = DockStyle.Fill;
-            pnlMain.Location = new Point(0, 130);
-            pnlMain.Name = "pnlMain";
-            pnlMain.Padding = new Padding(8);
-            pnlMain.Size = new Size(950, 390);
-            pnlMain.TabIndex = 2;
-            //
-            // pnlAvailable - Left panel with glass effect
-            //
-            pnlAvailable.BackColor = Color.FromArgb(32, 36, 42);
-            pnlAvailable.Controls.Add(lstAvailable);
-            pnlAvailable.Controls.Add(txtSearchAvailable);
-            pnlAvailable.Controls.Add(lblAvailable);
-            pnlAvailable.Dock = DockStyle.Left;
-            pnlAvailable.Location = new Point(8, 8);
-            pnlAvailable.Name = "pnlAvailable";
-            pnlAvailable.Padding = new Padding(12);
-            pnlAvailable.Size = new Size(510, 374);
-            pnlAvailable.TabIndex = 0;
-            //
-            // lstAvailable
-            //
-            lstAvailable.BackColor = Color.FromArgb(28, 31, 38);
-            lstAvailable.BorderStyle = BorderStyle.None;
-            lstAvailable.Columns.AddRange(new ColumnHeader[] { colAvailableName, colAvailableQty, colAvailableFound });
-            lstAvailable.Dock = DockStyle.Fill;
-            lstAvailable.ForeColor = Color.FromArgb(200, 210, 220);
-            lstAvailable.FullRowSelect = true;
-            lstAvailable.Location = new Point(12, 62);
-            lstAvailable.MultiSelect = true;
-            lstAvailable.Name = "lstAvailable";
-            lstAvailable.Size = new Size(376, 300);
-            lstAvailable.TabIndex = 2;
-            lstAvailable.UseCompatibleStateImageBehavior = false;
-            lstAvailable.View = View.Details;
+            pnlMain.Padding = new Padding(10);
+
+            tableMain.ColumnCount = 3;
+            tableMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tableMain.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180F));
+            tableMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tableMain.Controls.Add(pnlAvailable, 0, 0);
+            tableMain.Controls.Add(pnlButtons, 1, 0);
+            tableMain.Controls.Add(pnlQueue, 2, 0);
+            tableMain.Dock = DockStyle.Fill;
+            tableMain.RowCount = 1;
+            tableMain.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            ConfigureListPanel(pnlAvailable);
+            pnlAvailable.Controls.Add(tableAvailable);
+            tableAvailable.ColumnCount = 1;
+            tableAvailable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            tableAvailable.Controls.Add(lblAvailable, 0, 0);
+            tableAvailable.Controls.Add(lblAvailableHelp, 0, 1);
+            tableAvailable.Controls.Add(txtSearchAvailable, 0, 2);
+            tableAvailable.Controls.Add(lstAvailable, 0, 3);
+            tableAvailable.Dock = DockStyle.Fill;
+            tableAvailable.Padding = new Padding(10);
+            tableAvailable.RowCount = 4;
+            tableAvailable.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
+            tableAvailable.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
+            tableAvailable.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+            tableAvailable.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            ConfigureSectionLabel(lblAvailable, "Available Files", Color.FromArgb(100, 160, 220));
+            ConfigureHelpLabel(lblAvailableHelp, "Ctrl/Shift-click selects multiple; double-click adds");
+            ConfigureSearchBox(txtSearchAvailable, "Search available files...");
+            txtSearchAvailable.TextChanged += txtSearchAvailable_TextChanged;
+            ConfigureListView(lstAvailable);
+            lstAvailable.Columns.AddRange(new ColumnHeader[]
+            {
+                colAvailableName,
+                colAvailableQty,
+                colAvailableVariant,
+                colAvailableStatus
+            });
+            ConfigureColumns(colAvailableName, colAvailableQty, colAvailableVariant, colAvailableStatus);
+            lstAvailable.SelectedIndexChanged += lstAvailable_SelectedIndexChanged;
             lstAvailable.DoubleClick += lstAvailable_DoubleClick;
             lstAvailable.KeyDown += lstAvailable_KeyDown;
-            //
-            // colAvailableName
-            //
-            colAvailableName.Text = "File Name";
-            colAvailableName.Width = 350;
-            //
-            // colAvailableQty
-            //
-            colAvailableQty.Text = "Qty";
-            colAvailableQty.Width = 50;
-            //
-            // colAvailableFound
-            //
-            colAvailableFound.Text = "Found";
-            colAvailableFound.Width = 60;
-            //
-            // txtSearchAvailable
-            //
-            txtSearchAvailable.BackColor = Color.FromArgb(40, 44, 52);
-            txtSearchAvailable.BorderStyle = BorderStyle.FixedSingle;
-            txtSearchAvailable.Dock = DockStyle.Top;
-            txtSearchAvailable.ForeColor = Color.FromArgb(180, 190, 200);
-            txtSearchAvailable.Location = new Point(12, 38);
-            txtSearchAvailable.Name = "txtSearchAvailable";
-            txtSearchAvailable.PlaceholderText = "Search files...";
-            txtSearchAvailable.Size = new Size(376, 27);
-            txtSearchAvailable.TabIndex = 1;
-            txtSearchAvailable.TextChanged += txtSearchAvailable_TextChanged;
-            //
-            // lblAvailable
-            //
-            lblAvailable.Dock = DockStyle.Top;
-            lblAvailable.Font = new Font("Iosevka", 11F, FontStyle.Bold);
-            lblAvailable.ForeColor = Color.FromArgb(100, 160, 220);
-            lblAvailable.Location = new Point(12, 12);
-            lblAvailable.Name = "lblAvailable";
-            lblAvailable.Padding = new Padding(0, 0, 0, 6);
-            lblAvailable.Size = new Size(376, 30);
-            lblAvailable.TabIndex = 0;
-            lblAvailable.Text = "Available Files";
-            //
-            // pnlButtons - Center buttons
-            //
-            pnlButtons.BackColor = Color.FromArgb(20, 22, 26);
-            pnlButtons.Controls.Add(btnAddAll);
+
+            pnlButtons.BackColor = Color.FromArgb(18, 20, 24);
+            pnlButtons.Dock = DockStyle.Fill;
+            pnlButtons.FlowDirection = FlowDirection.TopDown;
+            pnlButtons.Padding = new Padding(10, 76, 10, 10);
+            pnlButtons.WrapContents = false;
             pnlButtons.Controls.Add(btnAdd);
+            pnlButtons.Controls.Add(btnAddAll);
             pnlButtons.Controls.Add(btnRemove);
             pnlButtons.Controls.Add(btnClearQueue);
-            pnlButtons.Controls.Add(btnFloOnly);
-            pnlButtons.Dock = DockStyle.Left;
-            pnlButtons.Location = new Point(408, 8);
-            pnlButtons.Name = "pnlButtons";
-            pnlButtons.Size = new Size(90, 374);
-            pnlButtons.TabIndex = 1;
-            //
-            // btnAddAll
-            //
-            btnAddAll.BackColor = Color.FromArgb(50, 55, 65);
-            btnAddAll.Cursor = Cursors.Hand;
-            btnAddAll.FlatAppearance.BorderColor = Color.FromArgb(70, 80, 95);
-            btnAddAll.FlatAppearance.MouseOverBackColor = Color.FromArgb(65, 70, 85);
-            btnAddAll.FlatStyle = FlatStyle.Flat;
-            btnAddAll.Font = new Font("Iosevka", 8F);
-            btnAddAll.ForeColor = Color.FromArgb(180, 190, 200);
-            btnAddAll.Location = new Point(10, 100);
-            btnAddAll.Name = "btnAddAll";
-            btnAddAll.Size = new Size(70, 28);
-            btnAddAll.TabIndex = 1;
-            btnAddAll.Text = "Add All";
-            btnAddAll.UseVisualStyleBackColor = false;
-            btnAddAll.Click += btnAddAll_Click;
-            //
-            // btnAdd
-            //
-            btnAdd.BackColor = Color.FromArgb(40, 100, 80);
-            btnAdd.Cursor = Cursors.Hand;
-            btnAdd.FlatAppearance.BorderColor = Color.FromArgb(50, 130, 100);
-            btnAdd.FlatAppearance.MouseOverBackColor = Color.FromArgb(50, 120, 95);
-            btnAdd.FlatStyle = FlatStyle.Flat;
-            btnAdd.Font = new Font("Iosevka", 10F, FontStyle.Bold);
-            btnAdd.ForeColor = Color.FromArgb(200, 230, 210);
-            btnAdd.Location = new Point(10, 140);
-            btnAdd.Name = "btnAdd";
-            btnAdd.Size = new Size(70, 32);
-            btnAdd.TabIndex = 0;
-            btnAdd.Text = ">>";
-            btnAdd.UseVisualStyleBackColor = false;
+
+            ConfigureQueueButton(btnAdd, "Add Selected  >", Color.FromArgb(40, 100, 80));
             btnAdd.Click += btnAdd_Click;
-            //
-            // btnRemove
-            //
-            btnRemove.BackColor = Color.FromArgb(120, 50, 50);
-            btnRemove.Cursor = Cursors.Hand;
-            btnRemove.FlatAppearance.BorderColor = Color.FromArgb(150, 60, 60);
-            btnRemove.FlatAppearance.MouseOverBackColor = Color.FromArgb(140, 60, 60);
-            btnRemove.FlatStyle = FlatStyle.Flat;
-            btnRemove.Font = new Font("Iosevka", 10F, FontStyle.Bold);
-            btnRemove.ForeColor = Color.FromArgb(230, 200, 200);
-            btnRemove.Location = new Point(10, 200);
-            btnRemove.Name = "btnRemove";
-            btnRemove.Size = new Size(70, 32);
-            btnRemove.TabIndex = 2;
-            btnRemove.Text = "<<";
-            btnRemove.UseVisualStyleBackColor = false;
+            ConfigureQueueButton(btnAddAll, "Add All Filtered  >>", Color.FromArgb(50, 75, 95));
+            btnAddAll.Click += btnAddAll_Click;
+            ConfigureQueueButton(btnRemove, "<  Remove Selected", Color.FromArgb(110, 55, 55));
+            btnRemove.Margin = new Padding(3, 20, 3, 4);
             btnRemove.Click += btnRemove_Click;
-            //
-            // btnClearQueue
-            //
-            btnClearQueue.BackColor = Color.FromArgb(50, 55, 65);
-            btnClearQueue.Cursor = Cursors.Hand;
-            btnClearQueue.FlatAppearance.BorderColor = Color.FromArgb(70, 80, 95);
-            btnClearQueue.FlatAppearance.MouseOverBackColor = Color.FromArgb(65, 70, 85);
-            btnClearQueue.FlatStyle = FlatStyle.Flat;
-            btnClearQueue.Font = new Font("Iosevka", 8F);
-            btnClearQueue.ForeColor = Color.FromArgb(180, 190, 200);
-            btnClearQueue.Location = new Point(10, 244);
-            btnClearQueue.Name = "btnClearQueue";
-            btnClearQueue.Size = new Size(70, 28);
-            btnClearQueue.TabIndex = 3;
-            btnClearQueue.Text = "Clear";
-            btnClearQueue.UseVisualStyleBackColor = false;
+            ConfigureQueueButton(btnClearQueue, "Clear Queue", Color.FromArgb(55, 58, 65));
             btnClearQueue.Click += btnClearQueue_Click;
-            //
-            // btnFloOnly
-            //
-            btnFloOnly.BackColor = Color.FromArgb(90, 70, 120);
-            btnFloOnly.Cursor = Cursors.Hand;
-            btnFloOnly.FlatAppearance.BorderColor = Color.FromArgb(110, 90, 140);
-            btnFloOnly.FlatAppearance.MouseOverBackColor = Color.FromArgb(100, 80, 130);
-            btnFloOnly.FlatStyle = FlatStyle.Flat;
-            btnFloOnly.Font = new Font("Iosevka", 8F);
-            btnFloOnly.ForeColor = Color.FromArgb(220, 210, 240);
-            btnFloOnly.Location = new Point(10, 284);
-            btnFloOnly.Name = "btnFloOnly";
-            btnFloOnly.Size = new Size(70, 28);
-            btnFloOnly.TabIndex = 4;
-            btnFloOnly.Text = "FLO Only";
-            btnFloOnly.UseVisualStyleBackColor = false;
-            btnFloOnly.Click += btnFloOnly_Click;
-            //
-            // pnlQueue - Right panel with glass effect
-            //
-            pnlQueue.BackColor = Color.FromArgb(32, 36, 42);
-            pnlQueue.Controls.Add(lstQueue);
-            pnlQueue.Controls.Add(txtSearchQueue);
-            pnlQueue.Controls.Add(lblQueue);
-            pnlQueue.Dock = DockStyle.Fill;
-            pnlQueue.Location = new Point(498, 8);
-            pnlQueue.Name = "pnlQueue";
-            pnlQueue.Padding = new Padding(12);
-            pnlQueue.Size = new Size(444, 374);
-            pnlQueue.TabIndex = 2;
-            //
-            // lstQueue
-            //
-            lstQueue.BackColor = Color.FromArgb(28, 31, 38);
-            lstQueue.BorderStyle = BorderStyle.None;
-            lstQueue.Columns.AddRange(new ColumnHeader[] { colQueueName, colQueueQty, colQueueFound });
-            lstQueue.Dock = DockStyle.Fill;
-            lstQueue.ForeColor = Color.FromArgb(200, 210, 220);
-            lstQueue.FullRowSelect = true;
-            lstQueue.Location = new Point(12, 62);
-            lstQueue.MultiSelect = true;
-            lstQueue.Name = "lstQueue";
-            lstQueue.Size = new Size(420, 300);
-            lstQueue.TabIndex = 2;
-            lstQueue.UseCompatibleStateImageBehavior = false;
-            lstQueue.View = View.Details;
+
+            ConfigureListPanel(pnlQueue);
+            pnlQueue.Controls.Add(tableQueue);
+            tableQueue.ColumnCount = 1;
+            tableQueue.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            tableQueue.Controls.Add(lblQueue, 0, 0);
+            tableQueue.Controls.Add(lblQueueHelp, 0, 1);
+            tableQueue.Controls.Add(txtSearchQueue, 0, 2);
+            tableQueue.Controls.Add(lstQueue, 0, 3);
+            tableQueue.Dock = DockStyle.Fill;
+            tableQueue.Padding = new Padding(10);
+            tableQueue.RowCount = 4;
+            tableQueue.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
+            tableQueue.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
+            tableQueue.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+            tableQueue.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            ConfigureSectionLabel(lblQueue, "Copy Queue (0)", Color.FromArgb(80, 180, 140));
+            ConfigureHelpLabel(lblQueueHelp, "Ctrl/Shift-click selects multiple; double-click removes");
+            ConfigureSearchBox(txtSearchQueue, "Search copy queue...");
+            txtSearchQueue.TextChanged += txtSearchQueue_TextChanged;
+            ConfigureListView(lstQueue);
+            lstQueue.Columns.AddRange(new ColumnHeader[]
+            {
+                colQueueName,
+                colQueueQty,
+                colQueueVariant,
+                colQueueStatus
+            });
+            ConfigureColumns(colQueueName, colQueueQty, colQueueVariant, colQueueStatus);
+            lstQueue.SelectedIndexChanged += lstQueue_SelectedIndexChanged;
             lstQueue.DoubleClick += lstQueue_DoubleClick;
             lstQueue.KeyDown += lstQueue_KeyDown;
-            //
-            // colQueueName
-            //
-            colQueueName.Text = "File Name";
-            colQueueName.Width = 350;
-            //
-            // colQueueQty
-            //
-            colQueueQty.Text = "Qty";
-            colQueueQty.Width = 50;
-            //
-            // colQueueFound
-            //
-            colQueueFound.Text = "Found";
-            colQueueFound.Width = 60;
-            //
-            // txtSearchQueue
-            //
-            txtSearchQueue.BackColor = Color.FromArgb(40, 44, 52);
-            txtSearchQueue.BorderStyle = BorderStyle.FixedSingle;
-            txtSearchQueue.Dock = DockStyle.Top;
-            txtSearchQueue.ForeColor = Color.FromArgb(180, 190, 200);
-            txtSearchQueue.Location = new Point(12, 38);
-            txtSearchQueue.Name = "txtSearchQueue";
-            txtSearchQueue.PlaceholderText = "Search queue...";
-            txtSearchQueue.Size = new Size(420, 27);
-            txtSearchQueue.TabIndex = 1;
-            txtSearchQueue.TextChanged += txtSearchQueue_TextChanged;
-            //
-            // lblQueue
-            //
-            lblQueue.Dock = DockStyle.Top;
-            lblQueue.Font = new Font("Iosevka", 11F, FontStyle.Bold);
-            lblQueue.ForeColor = Color.FromArgb(80, 180, 140);
-            lblQueue.Location = new Point(12, 12);
-            lblQueue.Name = "lblQueue";
-            lblQueue.Padding = new Padding(0, 0, 0, 6);
-            lblQueue.Size = new Size(420, 30);
-            lblQueue.TabIndex = 0;
-            lblQueue.Text = "Copy Queue";
-            //
-            // pnlBottom - Status bar with glass effect
-            //
+
+            // Bottom status
             pnlBottom.BackColor = Color.FromArgb(25, 25, 30);
-            pnlBottom.Controls.Add(btnStartCopy);
             pnlBottom.Controls.Add(lblStatus);
             pnlBottom.Controls.Add(progressBar);
+            pnlBottom.Controls.Add(btnStartCopy);
             pnlBottom.Dock = DockStyle.Bottom;
-            pnlBottom.Location = new Point(0, 520);
-            pnlBottom.Name = "pnlBottom";
+            pnlBottom.Height = 86;
             pnlBottom.Padding = new Padding(12);
-            pnlBottom.Size = new Size(950, 80);
-            pnlBottom.TabIndex = 3;
-            //
-            // btnStartCopy
-            //
-            btnStartCopy.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            btnStartCopy.BackColor = Color.FromArgb(40, 100, 80);
-            btnStartCopy.Cursor = Cursors.Hand;
-            btnStartCopy.Enabled = false;
-            btnStartCopy.FlatAppearance.BorderColor = Color.FromArgb(50, 130, 100);
-            btnStartCopy.FlatAppearance.MouseOverBackColor = Color.FromArgb(50, 120, 95);
-            btnStartCopy.FlatStyle = FlatStyle.Flat;
-            btnStartCopy.Font = new Font("Iosevka", 10F, FontStyle.Bold);
-            btnStartCopy.ForeColor = Color.FromArgb(200, 230, 210);
-            btnStartCopy.Location = new Point(820, 38);
-            btnStartCopy.Name = "btnStartCopy";
-            btnStartCopy.Size = new Size(115, 28);
-            btnStartCopy.TabIndex = 2;
-            btnStartCopy.Text = "Start Copy";
-            btnStartCopy.UseVisualStyleBackColor = false;
-            btnStartCopy.Click += btnStartCopy_Click;
-            //
-            // lblStatus
-            //
+
             lblStatus.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            lblStatus.Font = new Font("Iosevka", 9F);
-            lblStatus.ForeColor = Color.FromArgb(140, 150, 160);
+            lblStatus.Font = new Font("Segoe UI", 9F);
+            lblStatus.ForeColor = Color.FromArgb(150, 160, 170);
             lblStatus.Location = new Point(12, 12);
-            lblStatus.Name = "lblStatus";
-            lblStatus.Size = new Size(800, 20);
-            lblStatus.TabIndex = 1;
-            lblStatus.Text = "Ready - Load a BOM or select a source folder";
-            //
-            // progressBar
-            //
+            lblStatus.Size = new Size(988, 22);
+            lblStatus.Text = "Ready - load a BOM or select a source folder";
+
             progressBar.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            progressBar.Location = new Point(12, 38);
-            progressBar.Name = "progressBar";
-            progressBar.Size = new Size(800, 28);
-            progressBar.TabIndex = 0;
-            //
-            // MainForm
-            //
+            progressBar.Location = new Point(12, 43);
+            progressBar.Size = new Size(988, 27);
+
+            ConfigureButton(btnStartCopy, Color.FromArgb(40, 100, 80), Color.FromArgb(210, 235, 220));
+            btnStartCopy.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnStartCopy.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            btnStartCopy.Location = new Point(1012, 39);
+            btnStartCopy.Size = new Size(154, 35);
+            btnStartCopy.Text = "Copy 0 Files";
+            btnStartCopy.Click += btnStartCopy_Click;
+
+            // Form
             AllowDrop = true;
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(18, 20, 24);
-            ClientSize = new Size(1140, 936);
+            ClientSize = new Size(1180, 760);
             Controls.Add(pnlMain);
             Controls.Add(pnlBottom);
             Controls.Add(pnlDirectories);
             Controls.Add(pnlTop);
-            Font = new Font("Iosevka", 9F, FontStyle.Regular, GraphicsUnit.Point);
-            MinimumSize = new Size(1080, 900);
+            Font = new Font("Segoe UI", 9F);
+            MinimumSize = new Size(1080, 680);
             Name = "MainForm";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "BOM Copier";
@@ -579,51 +333,173 @@ namespace BomCopier.Forms
             pnlDirectories.ResumeLayout(false);
             pnlDirectories.PerformLayout();
             pnlMain.ResumeLayout(false);
+            tableMain.ResumeLayout(false);
             pnlAvailable.ResumeLayout(false);
-            pnlAvailable.PerformLayout();
+            tableAvailable.ResumeLayout(false);
+            tableAvailable.PerformLayout();
             pnlButtons.ResumeLayout(false);
             pnlQueue.ResumeLayout(false);
-            pnlQueue.PerformLayout();
+            tableQueue.ResumeLayout(false);
+            tableQueue.PerformLayout();
             pnlBottom.ResumeLayout(false);
             ResumeLayout(false);
+        }
+
+        private static void ConfigureButton(Button button, Color backColor, Color foreColor)
+        {
+            button.BackColor = backColor;
+            button.Cursor = Cursors.Hand;
+            button.FlatAppearance.BorderColor = Color.FromArgb(75, 85, 95);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(
+                Math.Min(backColor.R + 15, 255),
+                Math.Min(backColor.G + 15, 255),
+                Math.Min(backColor.B + 15, 255));
+            button.FlatStyle = FlatStyle.Flat;
+            button.Font = new Font("Segoe UI", 9F);
+            button.ForeColor = foreColor;
+            button.UseVisualStyleBackColor = false;
+        }
+
+        private static void ConfigureQueueButton(Button button, string text, Color backColor)
+        {
+            ConfigureButton(button, backColor, Color.FromArgb(220, 230, 235));
+            button.Margin = new Padding(3, 4, 3, 4);
+            button.Size = new Size(154, 38);
+            button.Text = text;
+        }
+
+        private static void ConfigureLabel(Label label, string text)
+        {
+            label.Font = new Font("Segoe UI", 9F);
+            label.ForeColor = Color.FromArgb(185, 195, 205);
+            label.Text = text;
+        }
+
+        private static void ConfigureComboBox(ComboBox comboBox)
+        {
+            comboBox.BackColor = Color.FromArgb(35, 38, 45);
+            comboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            comboBox.FlatStyle = FlatStyle.Flat;
+            comboBox.ForeColor = Color.FromArgb(210, 220, 230);
+            comboBox.FormattingEnabled = true;
+        }
+
+        private static void ConfigurePathTextBox(TextBox textBox)
+        {
+            textBox.BackColor = Color.FromArgb(35, 38, 45);
+            textBox.BorderStyle = BorderStyle.FixedSingle;
+            textBox.ForeColor = Color.FromArgb(205, 215, 225);
+        }
+
+        private static void ConfigureListPanel(Panel panel)
+        {
+            panel.BackColor = Color.FromArgb(32, 36, 42);
+            panel.Dock = DockStyle.Fill;
+            panel.Margin = new Padding(0);
+        }
+
+        private static void ConfigureSectionLabel(Label label, string text, Color color)
+        {
+            label.Dock = DockStyle.Fill;
+            label.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            label.ForeColor = color;
+            label.Text = text;
+            label.TextAlign = ContentAlignment.MiddleLeft;
+        }
+
+        private static void ConfigureHelpLabel(Label label, string text)
+        {
+            label.Dock = DockStyle.Fill;
+            label.Font = new Font("Segoe UI", 8F, FontStyle.Italic);
+            label.ForeColor = Color.FromArgb(130, 140, 150);
+            label.Text = text;
+            label.TextAlign = ContentAlignment.MiddleLeft;
+        }
+
+        private static void ConfigureSearchBox(TextBox textBox, string placeholder)
+        {
+            textBox.BackColor = Color.FromArgb(40, 44, 52);
+            textBox.BorderStyle = BorderStyle.FixedSingle;
+            textBox.Dock = DockStyle.Fill;
+            textBox.ForeColor = Color.FromArgb(200, 210, 220);
+            textBox.Margin = new Padding(0, 3, 0, 5);
+            textBox.PlaceholderText = placeholder;
+        }
+
+        private static void ConfigureListView(ListView listView)
+        {
+            listView.BackColor = Color.FromArgb(28, 31, 38);
+            listView.BorderStyle = BorderStyle.None;
+            listView.Dock = DockStyle.Fill;
+            listView.ForeColor = Color.FromArgb(210, 220, 225);
+            listView.FullRowSelect = true;
+            listView.HideSelection = false;
+            listView.MultiSelect = true;
+            listView.UseCompatibleStateImageBehavior = false;
+            listView.View = View.Details;
+        }
+
+        private static void ConfigureColumns(
+            ColumnHeader name,
+            ColumnHeader quantity,
+            ColumnHeader variant,
+            ColumnHeader status)
+        {
+            name.Text = "File Name";
+            name.Width = 250;
+            quantity.Text = "Qty";
+            quantity.Width = 48;
+            variant.Text = "Variant";
+            variant.Width = 72;
+            status.Text = "Status";
+            status.Width = 108;
         }
 
         #endregion
 
         private Panel pnlTop;
         private Button btnLoadBom;
-        private Button btnSettings;
         private Label lblMaterial;
         private ComboBox cmbMaterial;
+        private Label lblVariant;
+        private ComboBox cmbVariant;
         private Label lblFileCount;
+        private Button btnSettings;
         private Panel pnlDirectories;
         private Label lblSource;
         private TextBox txtSourceDirectory;
         private Button btnBrowseSource;
+        private Button btnScanSource;
         private Label lblTarget;
         private TextBox txtTargetDirectory;
         private Button btnBrowseTarget;
         private Panel pnlMain;
+        private TableLayoutPanel tableMain;
         private Panel pnlAvailable;
+        private TableLayoutPanel tableAvailable;
         private Label lblAvailable;
+        private Label lblAvailableHelp;
         private TextBox txtSearchAvailable;
         private ListView lstAvailable;
         private ColumnHeader colAvailableName;
         private ColumnHeader colAvailableQty;
-        private ColumnHeader colAvailableFound;
-        private Panel pnlButtons;
+        private ColumnHeader colAvailableVariant;
+        private ColumnHeader colAvailableStatus;
+        private FlowLayoutPanel pnlButtons;
         private Button btnAdd;
         private Button btnAddAll;
         private Button btnRemove;
         private Button btnClearQueue;
-        private Button btnFloOnly;
         private Panel pnlQueue;
+        private TableLayoutPanel tableQueue;
         private Label lblQueue;
+        private Label lblQueueHelp;
         private TextBox txtSearchQueue;
         private ListView lstQueue;
         private ColumnHeader colQueueName;
         private ColumnHeader colQueueQty;
-        private ColumnHeader colQueueFound;
+        private ColumnHeader colQueueVariant;
+        private ColumnHeader colQueueStatus;
         private Panel pnlBottom;
         private ProgressBar progressBar;
         private Label lblStatus;

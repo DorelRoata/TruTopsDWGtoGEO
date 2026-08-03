@@ -38,9 +38,19 @@ namespace BomCopier.Models
         public string? SourcePath { get; set; }
 
         /// <summary>
+        /// Number of source files with the requested filename. More than one match is
+        /// treated as ambiguous so the app never silently copies the wrong drawing.
+        /// </summary>
+        public int MatchCount { get; set; }
+
+        /// <summary>
         /// Whether the file was found in the source directory
         /// </summary>
-        public bool IsFound => !string.IsNullOrEmpty(SourcePath);
+        public bool IsFound => MatchCount == 1 && !string.IsNullOrEmpty(SourcePath);
+
+        public bool IsAmbiguous => MatchCount > 1;
+
+        public bool CanCopy => IsFound && !IsAmbiguous;
 
         /// <summary>
         /// Whether the found file is the FLO suffix version
