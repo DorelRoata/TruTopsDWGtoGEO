@@ -18,6 +18,7 @@ namespace BomCopier.Services
         public List<BomRow> LoadBom(string filePath, AppConfig config)
         {
             var rows = new List<BomRow>();
+            var rowsByPartAndMaterial = new Dictionary<string, BomRow>(StringComparer.OrdinalIgnoreCase);
 
             try
             {
@@ -63,7 +64,14 @@ namespace BomCopier.Services
                     string normalName = baseName + config.TargetFileExtension;           // e.g., "partname.dwg"
                     string suffixName = baseName + config.FilenameSuffix + config.TargetFileExtension;  // e.g., "partnameFLO.dwg"
 
-                    rows.Add(new BomRow
+                    string aggregateKey = normalName + "\0" + material;
+                    if (rowsByPartAndMaterial.TryGetValue(aggregateKey, out var existingRow))
+                    {
+                        existingRow.Quantity += quantity;
+                        continue;
+                    }
+
+                    var bomRow = new BomRow
                     {
                         OriginalFileName = originalName,
                         NormalFileName = normalName,
@@ -71,7 +79,9 @@ namespace BomCopier.Services
                         TargetFileName = normalName,  // Default to normal, will be updated when found
                         Material = material,
                         Quantity = quantity
-                    });
+                    };
+                    rows.Add(bomRow);
+                    rowsByPartAndMaterial[aggregateKey] = bomRow;
                 }
 
                 LogService.Log($"Loaded {rows.Count} rows from BOM: {filePath}");

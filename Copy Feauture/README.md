@@ -1,56 +1,76 @@
 # BOM Copier
 
-## Overview
-A lightweight Windows desktop app to copy SolidWorks part files based on exported Excel Bills of Materials (BOMs).
+BOM Copier is a Windows desktop app for finding DWG files from an exported SolidWorks Excel BOM and copying selected drawings into a manually chosen folder. It copies files only; it never moves or deletes the source drawings.
 
-**Purpose:**
-Import an Excel BOM, filter by material type, manually queue files for copying, and safely duplicate them to a target folder. Consolidates multiple manual tools into one. Original files are never moved or deleted - copy only.
+## Workflow
 
-## Features (Version 1.0)
-- Configurable column mapping (material, filename, quantity, handedness) via Settings.
-- Load Excel BOM, select material from dropdown.
-- Dual-panel view: left = matching files, right = copy queue (move items with buttons or double-click).
-- Live search and sorting on both panels.
-- Set source and target directories.
-- Start Copy with progress bar and summary.
-- Overwrite toggle (default: on - newer CAD files win).
-- Logs to `log.txt`.
+1. Open **Settings** and map the document name, material, and quantity columns used by the BOM.
+2. Select **Load BOM**, then choose the folder containing the DWG library.
+3. Select a material exactly as it appears in the BOM, such as `7GA2B`, `7GA#3`, or `11GA2B`.
+4. Choose how normal and FLO drawings should be shown.
+5. Select one or more available drawings and add them to the copy queue.
+6. Browse to the copy folder for this batch, then select **Copy N Files**.
 
-## Future Features
-- Auto-create folders named after material (e.g., "7 gauge 2B").
-- Direct SolidWorks integration.
-- Backup before overwrite.
+The app does not create material folders. The operator chooses the destination for every batch, so the same material can be sent to different job folders as needed.
 
-## Usage
-1. Run the app - Settings opens on first launch.
-2. Map your BOM columns and save.
-3. Load BOM Excel file.
-4. Pick material, queue files, set directories.
-5. Hit Start Copy.
+## Selection and queue controls
 
-Built in C# with WinForms for speed and simplicity.
+- Click selects one row.
+- `Ctrl`+click selects individual rows.
+- `Shift`+click selects a range.
+- `Ctrl`+`A` selects all visible rows.
+- Double-click an available row to add it to the queue.
+- Double-click a queued row, or press `Delete`, to remove it.
+- **Add Selected** adds the current selection.
+- **Add All Filtered** adds every copyable row currently visible after the material, variant, and search filters are applied.
+- Changing a filter does not clear the queue.
 
-## Project Structure
+## Drawing variants
+
+- **Prefer FLO** shows one drawing per BOM part. A ready FLO drawing is used when available; otherwise the normal drawing is used.
+- **Normal only** shows the normal DWG candidate.
+- **FLO only** shows the configured suffix variant.
+- **Show both** shows both candidates so either or both can be queued.
+
+## File status and safety
+
+- **Ready** means exactly one matching source drawing was found.
+- **Missing** means no exact filename match was found.
+- **Duplicate (N)** means the same filename exists in more than one source location. It is shown for review but cannot be queued, preventing an arbitrary drawing from being copied.
+- Repeated scans always start from the original BOM data and do not multiply results.
+- Repeated BOM lines for the same part and material are combined and their quantities are summed.
+- Successfully copied files leave the queue. Skipped or failed files remain so they can be corrected and retried.
+- Copy activity is recorded in `log.txt` beside the application.
+
+## Settings
+
+The settings file controls:
+
+- BOM header row count
+- document name, material, and quantity column numbers
+- SolidWorks filename extension from the BOM
+- DWG filename suffix (default `FLO`)
+- target drawing extension (default `.dwg`)
+- whether an existing destination file may be overwritten
+- last-used BOM, source folder, and copy folder
+
+## Build
+
+Requirements:
+
+- Windows 10 or 11
+- .NET 8 SDK to build from source
+
+From the repository root:
+
+```powershell
+dotnet build "Copy Feauture\BomCopier\BomCopier.csproj" --configuration Release
 ```
-Copy Feauture/
-├── README.md              # This file
-├── DEVELOPMENT_SPEC.md    # Detailed development specification
-├── TODO.md                # Implementation task list
-├── config.example.json    # Example configuration file
-└── src/                   # Source code (to be created)
-    ├── BomCopier/
-    │   ├── Program.cs
-    │   ├── BomCopierForm.cs
-    │   ├── SettingsWindow.cs
-    │   ├── Models/
-    │   │   └── BomRow.cs
-    │   └── Services/
-    │       ├── ConfigService.cs
-    │       └── ExcelService.cs
-    └── BomCopier.sln
+
+Create a self-contained Windows x64 build:
+
+```powershell
+dotnet publish "Copy Feauture\BomCopier\BomCopier.csproj" --configuration Release --runtime win-x64 --self-contained true --output "Copy Feauture\BomCopier\publish"
 ```
 
-## Requirements
-- Windows 10/11
-- .NET 6.0+ Runtime
-- Microsoft Access Database Engine (for Excel OleDb access)
+The current project reads Excel workbooks directly through EPPlus; Microsoft Excel and the Access Database Engine are not required.

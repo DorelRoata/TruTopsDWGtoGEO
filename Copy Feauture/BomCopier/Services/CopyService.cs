@@ -8,6 +8,9 @@ namespace BomCopier.Services
         public int Skipped { get; set; }
         public int Errors { get; set; }
         public List<string> ErrorMessages { get; } = new();
+        public List<BomRow> CopiedFiles { get; } = new();
+        public List<BomRow> SkippedFiles { get; } = new();
+        public List<BomRow> FailedFiles { get; } = new();
     }
 
     public class CopyService
@@ -52,6 +55,7 @@ namespace BomCopier.Services
                 {
                     LogService.LogSkipped(file.TargetFileName, "Source file not found");
                     result.Skipped++;
+                    result.SkippedFiles.Add(file);
                     continue;
                 }
 
@@ -66,6 +70,7 @@ namespace BomCopier.Services
                     {
                         LogService.LogSkipped(file.TargetFileName, "Target exists (overwrite disabled)");
                         result.Skipped++;
+                        result.SkippedFiles.Add(file);
                         continue;
                     }
 
@@ -73,12 +78,14 @@ namespace BomCopier.Services
                     File.Copy(file.SourcePath, targetPath, overwrite);
                     LogService.LogCopied(file.TargetFileName, targetExists);
                     result.Copied++;
+                    result.CopiedFiles.Add(file);
                 }
                 catch (Exception ex)
                 {
                     LogService.LogError(file.TargetFileName, ex.Message);
                     result.Errors++;
                     result.ErrorMessages.Add($"{file.TargetFileName}: {ex.Message}");
+                    result.FailedFiles.Add(file);
                 }
             }
 
