@@ -26,6 +26,10 @@ namespace BomCopier.Forms
         {
             InitializeComponent();
 
+            string appVersion = GetAppVersion();
+            Text = $"BOM Copier v{appVersion}";
+            lblVersion.Text = $"Version {appVersion}";
+
             string iconPath = Path.Combine(AppContext.BaseDirectory, "bc_icon.ico");
             if (File.Exists(iconPath))
             {
@@ -536,6 +540,14 @@ namespace BomCopier.Forms
                 item.Selected = true;
             }
             listView.EndUpdate();
+        }
+
+        private static string GetAppVersion()
+        {
+            Version? version = typeof(MainForm).Assembly.GetName().Version;
+            return version == null
+                ? "Unknown"
+                : $"{version.Major}.{version.Minor}.{version.Build}";
         }
 
         private void btnLoadBom_Click(object sender, EventArgs e)
