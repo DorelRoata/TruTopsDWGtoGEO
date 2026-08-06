@@ -35,6 +35,8 @@ GEO_POLICY_LABELS = {
 
 GEO_POLICY_NAMES = {value: key for key, value in GEO_POLICY_LABELS.items()}
 
+from dwg_filter import DwgProjectFilter, FilterError
+
 def resource_path(relative_path):
     """Get absolute path to resource, works for dev and for PyInstaller"""
     try:
@@ -72,12 +74,17 @@ DEFAULT_CONFIG = {
     "auto_delay": 3,                    # Seconds to wait in auto mode
     "manual_hotkey": "f2",              # Hotkey for manual trigger
     "existing_geo_policy": "skip_existing",
+    "oda_converter_path": "",
+    "project_root": "",
     "click_locations": {
         "open_drawing": [549, 114],          # Open Drawing button (not Ctrl+O)
         "no_save": [3009, 672],              # "No" button - don't save modifications
         "save_selected": [680, 126],         # Save Selected to GEO button
         "select_top_left": [75, 209],        # Top-left corner of selection box
         "select_bottom_right": [3350, 1867], # Bottom-right corner of selection box
+        "delete_selection": None,
+        "cleanup_color": None,
+        "cleanup_delete": None,
     },
     "relative_click_locations": {},
     "buttons": {
@@ -551,8 +558,8 @@ class LocationSetupDialog(tk.Toplevel):
         self.parent = parent
         self.config = config
         self.title("Setup Window-Relative Click Locations")
-        self.geometry("650x580")
-        self.minsize(650, 580)
+        self.geometry("650x780")
+        self.minsize(650, 700)
         self.transient(parent)
         self.grab_set()
 
@@ -566,6 +573,9 @@ class LocationSetupDialog(tk.Toplevel):
             "save_selected": "Save Selected to GEO",
             "select_top_left": "Selection TOP-LEFT",
             "select_bottom_right": "Selection BOTTOM-RIGHT",
+            "delete_selection": "Delete Selection button",
+            "cleanup_color": "Cleanup color checkbox",
+            "cleanup_delete": "Delete button in cleanup dialog",
         }
 
         self.captured = {}
@@ -1329,6 +1339,10 @@ class AutomationRunner:
         file_name = os.path.basename(item["dwg"])
         self._show_group("save", file_name)
 
+        expected_geo = Path(item.get("geo") or self._expected_geo_path(item["dwg"]))
+        if expected_geo.exists():
+            return False, "GEO already exists; it was not overwritten"
+
         if not self._focus_trutops():
             return False, "TruTops could not be focused"
 
@@ -1373,6 +1387,11 @@ class AutomationRunner:
             timeout=save_timeout,
         ):
             return False, "The GEO save screen did not close"
+
+        if not expected_geo.exists():
+            return False, "Expected GEO was not created: {}".format(expected_geo)
+        if item.get("manifest"):
+            DwgProjectFilter.mark_geo_complete(item)
 
         return True, None
 
@@ -1446,12 +1465,14 @@ class AutomationRunner:
             item = self.files[i]
             file_path = item["dwg"]
             file_name = os.path.basename(file_path)
-
             self.current_index = i
             self.current_file_path = file_path
             self.config.set("last_processed_index", i)
 
-            reason = self._skip_reason(file_path)
+            if item.get("geo") and Path(item["geo"]).exists():
+                reason = "GEO already exists"
+            else:
+                reason = self._skip_reason(file_path)
             if reason:
                 skipped += 1
                 print("[SKIP] {} - {}".format(file_name, reason))
@@ -1508,6 +1529,149 @@ class AutomationRunner:
         self.app.after(0, self.app.on_automation_stopped)
 
 
+class ManualController:
+    """Global Ctrl shortcuts for small, operator-controlled jobs."""
+
+    def __init__(self, app):
+        self.app = app
+        self.config = app.config
+        self.listener = None
+        self.busy = False
+        self.cancelled = False
+
+    def start(self):
+        self.listener = keyboard.GlobalHotKeys({
+            "<ctrl>+1": lambda: self.app.after(0, lambda: self.trigger("cleanup")),
+            "<ctrl>+2": lambda: self.app.after(0, lambda: self.trigger("geo")),
+            "<ctrl>+3": lambda: self.app.after(0, lambda: self.trigger("next")),
+            "<ctrl>+<enter>": lambda: self.app.after(0, lambda: self.trigger("all")),
+            "<ctrl>+<esc>": lambda: self.app.after(0, self.stop),
+        })
+        self.listener.start()
+
+    def close(self):
+        if self.listener:
+            self.listener.stop()
+            self.listener = None
+
+    def stop(self):
+        self.cancelled = True
+        if self.app.automation.running:
+            self.app.automation.stop()
+        self.app.update_status("Stopped by Ctrl+Esc")
+
+    def trigger(self, action):
+        if self.busy:
+            self.app.update_status("Manual action already running")
+            return
+        if self.app.automation.running:
+            # The AutomationRunner owns Ctrl+1 through Ctrl+5 while a batch is active.
+            return
+        if not self.app.files:
+            self.app.update_status("Select a project root first")
+            return
+        self._start_action(action, self._selected_index())
+
+    def _start_action(self, action, index):
+        self.busy = True
+        self.cancelled = False
+        threading.Thread(
+            target=self._run_action, args=(action, index), daemon=True
+        ).start()
+
+    def _selected_index(self):
+        selection = self.app.file_listbox.curselection()
+        return selection[0] if selection else 0
+
+    def _run_action(self, action, index):
+        try:
+            self.app.automation._focus_trutops()
+            if action in ("cleanup", "all"):
+                self._cleanup()
+            if action in ("geo", "all") and not self.cancelled:
+                self._geo(index)
+            if action in ("next", "all") and not self.cancelled:
+                self._open_next(index)
+        except Exception as exc:
+            self.app.after(0, lambda e=exc: messagebox.showerror("Manual Macro", str(e)))
+            self.app.after(0, lambda e=exc: self.app.update_status("Manual macro failed: " + str(e)))
+        finally:
+            self.busy = False
+
+    def _coords(self, name):
+        value = self.app.automation._resolve_location(name)
+        if not value:
+            raise RuntimeError("Capture '{}' in Settings first.".format(name))
+        return value
+
+    def _click(self, name, description):
+        if self.cancelled:
+            return
+        x, y = self._coords(name)
+        self.app.after(0, lambda d=description: self.app.update_status(d))
+        pyautogui.moveTo(x, y, duration=0.15)
+        pyautogui.click()
+        self._wait(0.8)
+
+    def _wait(self, seconds):
+        for _ in range(max(1, int(seconds * 10))):
+            if self.cancelled:
+                return
+            time.sleep(0.1)
+
+    def _cleanup(self):
+        self._click("delete_selection", "Opening cleanup")
+        self._click("cleanup_color", "Selecting cleanup color")
+        self._click("cleanup_delete", "Deleting cleanup geometry")
+
+    def _geo(self, index):
+        item = self.app.files[index]
+        geo_path = Path(item["geo"])
+        if geo_path.exists():
+            raise RuntimeError("GEO already exists; not overwritten: {}".format(geo_path))
+
+        self.app.after(0, lambda: self.app.update_file_status(index, "processing"))
+        self._click("save_selected", "Starting GEO save")
+        self._click("select_top_left", "Selecting part: first corner")
+        self._click("select_bottom_right", "Selecting part: second corner")
+        if self.cancelled:
+            return
+        pyautogui.press("enter")
+        self._wait(0.4)
+        pyautogui.press("enter")
+        self._wait(self.config.get("save_delay") or 2.0)
+        if not geo_path.exists():
+            raise RuntimeError("Expected GEO was not created: {}".format(geo_path))
+        DwgProjectFilter.mark_geo_complete(item)
+        self.app.after(0, lambda: self.app.update_file_status(index, "done"))
+        self.app.after(0, lambda: self.app.update_status("GEO saved: " + geo_path.name))
+
+    def _open_next(self, current_index):
+        next_index = current_index + 1
+        if next_index >= len(self.app.files):
+            self.app.after(0, lambda: self.app.update_status("No more queued files"))
+            return
+        item = self.app.files[next_index]
+        self._click("open_drawing", "Opening next drawing")
+        self._click("no_save", "Discarding current drawing changes")
+        self.app.automation._copy_to_clipboard(item["dwg"])
+        pyautogui.hotkey("ctrl", "v")
+        self._wait(0.3)
+        pyautogui.press("enter")
+        self._wait(1.0)
+        pyautogui.press("enter")
+        self._wait(self.config.get("import_delay") or 3.0)
+        self.app.after(0, lambda i=next_index: self._select_file(i))
+        if item.get("image"):
+            self.app.after(0, lambda p=item["image"]: self.app.image_viewer.show_image(p))
+
+    def _select_file(self, index):
+        self.app.file_listbox.selection_clear(0, tk.END)
+        self.app.file_listbox.selection_set(index)
+        self.app.file_listbox.see(index)
+        self.app.update_status("Opened " + os.path.basename(self.app.files[index]["dwg"]))
+
+
 class App(tk.Tk):
     """Main application window."""
 
@@ -1551,10 +1715,14 @@ class App(tk.Tk):
         self.config = Config()
         self.image_viewer = ImagePreviewWindow(self)
         self.automation = AutomationRunner(self)
+        self.manual_controller = ManualController(self)
         self.files = []
         self.file_status = {}
+        self.project_root = self.config.get("project_root") or ""
 
         self._create_widgets()
+        self.manual_controller.start()
+        self.protocol("WM_DELETE_WINDOW", self._close_app)
 
     def _create_widgets(self):
         """Create main window widgets."""
@@ -1653,6 +1821,13 @@ class App(tk.Tk):
             font=("Segoe UI", 9), wraplength=730, justify="left"
         ).pack(fill="x", pady=(8, 0))
 
+        tk.Label(
+            mode_frame,
+            text="When stopped: Ctrl+1 Clean | Ctrl+2 GEO | Ctrl+3 Next | Ctrl+Enter All | Ctrl+Esc Stop",
+            bg=self.colors["bg_light"], fg=self.colors["highlight"],
+            font=("Segoe UI", 9, "bold"),
+        ).pack(anchor="w", pady=(8, 0))
+
         # File List
         list_frame = ttk.LabelFrame(self, text="File Queue", padding=10)
         list_frame.pack(fill="both", expand=True, padx=15, pady=10)
@@ -1661,7 +1836,10 @@ class App(tk.Tk):
         toolbar = ttk.Frame(list_frame)
         toolbar.pack(fill="x", pady=(0, 5))
 
-        ttk.Button(toolbar, text="+ Select Folder", command=self._add_files).pack(side="left")
+        self.select_folder_btn = ttk.Button(
+            toolbar, text="+ Select Project Root", command=self._add_files
+        )
+        self.select_folder_btn.pack(side="left")
         ttk.Button(toolbar, text="Clear List", command=self._clear_files).pack(side="left", padx=5)
         
         self.file_count_label = ttk.Label(toolbar, text="0 files")
@@ -1726,66 +1904,128 @@ class App(tk.Tk):
         self.config.set("existing_geo_policy", policy)
 
     def _add_files(self):
-        """Select project folder and find files."""
-        folder = filedialog.askdirectory(title="Select Folder (Project Root or Filtered_DWGs)")
+        """Select a project root, preflight it, and filter only new drawings."""
+        folder = filedialog.askdirectory(
+            title="Select Project Root",
+            initialdir=self.project_root or None,
+        )
         if not folder:
             return
-
-        # Determine logic based on selection
-        base_name = os.path.basename(folder)
-        
-        if base_name == "Filtered_DWGs":
-            # User selected the Filtered_DWGs folder directly
-            dwg_dir = folder
-            # Assume images are in sibling folder
-            img_dir = os.path.join(os.path.dirname(folder), "DWG_Images")
-        else:
-            # User likely selected project root
-            potential_dwg = os.path.join(folder, "Filtered_DWGs")
-            if os.path.exists(potential_dwg):
-                dwg_dir = potential_dwg
-                img_dir = os.path.join(folder, "DWG_Images")
-            else:
-                # Fallback: Assume simple folder with dwgs
-                dwg_dir = folder
-                img_dir = folder  # Or maybe None? Let's check same folder for now
-
-        print(f"[FILE SCAN] DWG Dir: {dwg_dir}")
-        print(f"[FILE SCAN] IMG Dir: {img_dir}")
-
-        new_files = []
         try:
-            # os.listdir is faster than glob for simple extension check
-            for f in os.listdir(dwg_dir):
-                if f.lower().endswith(".dwg"):
-                    full_path = os.path.join(dwg_dir, f)
-                    
-                    # Look for corresponding image
-                    name_base = os.path.splitext(f)[0]
-                    img_path = None
-                    
-                    # Try common image extensions
-                    # Check img_dir first
-                    if os.path.exists(img_dir):
-                        for ext in [".png", ".jpg", ".jpeg"]:
-                            candidate = os.path.join(img_dir, name_base + ext)
-                            if os.path.exists(candidate):
-                                img_path = candidate
-                                break
-                    
-                    # Store tuple: (dwg_path, image_path)
-                    new_files.append({"dwg": full_path, "image": img_path})
-            
-            if not new_files:
-                messagebox.showwarning("No Files", "No DWG files found in:\n" + dwg_dir)
+            project_filter = DwgProjectFilter(self.config.get("oda_converter_path"))
+            records = project_filter.scan(folder)
+            summary = project_filter.summarize(records)
+            if not records:
+                messagebox.showwarning("No Files", "No source DWG files found under:\n" + folder)
                 return
-                
-            self.files = new_files
-            self._update_file_list()
-            self.image_viewer.deiconify() # Show viewer so they can position it
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"Error scanning folder: {e}")
+
+            details = (
+                "Material folders: {material_folders}\n"
+                "Source DWGs: {total}\n"
+                "New: {new}\n"
+                "Ready for TruTops: {ready}\n"
+                "Already completed: {complete}\n"
+                "Conflicts detected: {conflict}"
+            ).format(**summary)
+
+            if summary["conflict"]:
+                conflict_choice = messagebox.askyesnocancel(
+                    "Output Conflicts",
+                    details + "\n\n"
+                    "Yes: Skip conflicts\n"
+                    "No: Create versioned outputs (_v2, _v3, ...)\n"
+                    "Cancel: Stop without changing files",
+                )
+                if conflict_choice is None:
+                    return
+                if not conflict_choice:
+                    records = project_filter.version_conflicts(records)
+                    summary = project_filter.summarize(records)
+                    details = (
+                        "Material folders: {material_folders}\n"
+                        "Source DWGs: {total}\n"
+                        "New/versioned: {new}\n"
+                        "Ready for TruTops: {ready}\n"
+                        "Already completed: {complete}\n"
+                        "Conflicts skipped: {conflict}"
+                    ).format(**summary)
+
+            if summary["new"]:
+                if not project_filter.oda_path:
+                    if not messagebox.askyesno(
+                        "ODA File Converter Required",
+                        "New DWGs need filtering, but ODA File Converter was not found.\n\n"
+                        "Locate ODAFileConverter.exe now?",
+                    ):
+                        return
+                    oda_path = filedialog.askopenfilename(
+                        title="Locate ODAFileConverter.exe",
+                        filetypes=[("ODA File Converter", "ODAFileConverter.exe"), ("Programs", "*.exe")],
+                    )
+                    if not oda_path:
+                        return
+                    self.config.set("oda_converter_path", oda_path)
+                    project_filter = DwgProjectFilter(oda_path)
+                if not messagebox.askyesno(
+                    "Project Preflight",
+                    details + "\n\nFilter the new DWGs now? Existing files will not be overwritten.",
+                ):
+                    return
+            else:
+                messagebox.showinfo("Project Preflight", details)
+
+            self.project_root = folder
+            self.config.set("project_root", folder)
+            self.select_folder_btn.config(state="disabled")
+            self.update_status("Preparing project...")
+            threading.Thread(
+                target=self._prepare_project,
+                args=(project_filter, folder, records),
+                daemon=True,
+            ).start()
+        except (OSError, FilterError) as exc:
+            messagebox.showerror("Project Preflight", str(exc))
+
+    def _prepare_project(self, project_filter, folder, records):
+        try:
+            def progress(current, total, record):
+                name = os.path.basename(record["source"])
+                self.after(0, lambda n=name: self.update_status("Filtering " + n))
+                self.after(0, lambda c=current, t=total: self.update_progress(c, t))
+
+            project_filter.process_new(records, progress=progress)
+            refreshed = project_filter.scan(folder)
+            self.after(0, lambda: self._project_ready(refreshed))
+        except Exception as exc:
+            self.after(0, lambda e=exc: self._project_failed(e))
+
+    def _project_ready(self, records):
+        self.select_folder_btn.config(state="normal")
+        self.files = [record for record in records if record["status"] == "ready"]
+        self._update_file_list()
+        if self.files:
+            self.file_listbox.selection_set(0)
+            first_image = self.files[0].get("image")
+            if first_image:
+                self.image_viewer.show_image(first_image)
+        self.image_viewer.deiconify()
+        summary = DwgProjectFilter.summarize(records)
+        self.update_status(
+            "Ready: {} queued, {} completed, {} conflicts skipped".format(
+                len(self.files), summary["complete"], summary["conflict"]
+            )
+        )
+        if summary["conflict"]:
+            messagebox.showwarning(
+                "Outputs Not Overwritten",
+                "{} source file(s) have existing or changed outputs. They were skipped."
+                .format(summary["conflict"]),
+            )
+
+    def _project_failed(self, error):
+        self.select_folder_btn.config(state="normal")
+        self.update_status("Project preparation failed")
+        messagebox.showerror("Project Preparation", str(error))
 
     def _clear_files(self):
         """Clear file list."""
@@ -1798,7 +2038,8 @@ class App(tk.Tk):
         """Update the file listbox."""
         self.file_listbox.delete(0, tk.END)
         for i, item in enumerate(self.files):
-            name = os.path.basename(item["dwg"])
+            material = os.path.basename(item["material_dir"])
+            name = "{} / {}".format(material, os.path.basename(item["dwg"]))
             has_img = " [IMG]" if item["image"] else ""
             self.file_listbox.insert(tk.END, f"  {name}{has_img}")
             self.file_status[i] = "pending"
@@ -1901,7 +2142,10 @@ class App(tk.Tk):
             return
 
         self.file_status[index] = status
-        name = os.path.basename(self.files[index]["dwg"])
+        item = self.files[index]
+        name = "{} / {}".format(
+            os.path.basename(item["material_dir"]), os.path.basename(item["dwg"])
+        )
 
         prefix = {
             "pending": "  ", "processing": "> ", "done": "  ", "skipped": "  "
@@ -1930,6 +2174,11 @@ class App(tk.Tk):
         """Called when automation stops."""
         self.start_btn.config(state="normal")
         self.stop_btn.config(state="disabled")
+
+    def _close_app(self):
+        self.manual_controller.close()
+        self.automation.stop()
+        self.destroy()
 
 
 def main():

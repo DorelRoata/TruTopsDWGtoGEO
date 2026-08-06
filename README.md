@@ -15,6 +15,33 @@ A GUI automation tool that batch converts DWG files into GEO format for TrueTops
 - Newly captured click locations are relative to the TruTops window and continue to work when that window moves.
 - Existing GEO handling can skip existing files, replace them, or process only DWGs newer than their GEO.
 
+## Current Workflow
+
+1. Select the project root containing all material folders.
+2. The app recursively finds source DWGs, excluding `Filtered_DWGs` and `DWG_Images`.
+3. New DWGs are filtered without SolidWorks. Layer `0` and layers containing `ETCH` are preserved with their colors.
+4. Each material folder receives matching `Filtered_DWGs` and `DWG_Images` directories.
+5. Existing, changed, or untracked outputs are reported as conflicts and are never overwritten. Choose Skip, Cancel, or create `_v2`, `_v3`, and later versions.
+6. Existing GEO files are treated as complete and are not queued again.
+
+Each `Filtered_DWGs` directory contains `d2g-manifest.json`, which records the source hash and filter version used to create each output.
+
+### Manual Controls
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+1` | Run the captured TruTops cleanup clicks |
+| `Ctrl+2` | Select the current part, save GEO, and verify the output |
+| `Ctrl+3` | Open the next exact filtered DWG |
+| `Ctrl+Enter` | Clean, save GEO, and open the next drawing |
+| `Ctrl+Esc` | Stop the current action immediately |
+
+Capture all required TruTops click locations in **Settings** before using the manual controls.
+
+### DWG Filter Requirement
+
+Install the free 64-bit **ODA File Converter** from Open Design Alliance. If it is not in the standard installation directory, the app asks you to locate `ODAFileConverter.exe` the first time new DWGs need filtering.
+
 ---
 
 ## Time Savings Estimate

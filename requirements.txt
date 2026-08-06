@@ -3,3 +3,5 @@ opencv-python>=4.8.0
 pillow>=10.0.0
 pynput>=1.7.6
 pywin32>=306
+ezdxf>=1.4.0
+matplotlib>=3.9.0

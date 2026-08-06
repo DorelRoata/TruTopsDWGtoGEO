@@ -65,5 +65,6 @@ To run this tool on another computer without installing Python:
 2.  (Optional) Copy `config.json` if you want to keep your current settings (hotkeys, delays). If you don't copy it, the app will create a fresh one with defaults.
 3.  **Requirements**:
     - Windows 10/11.
-    - No other installation needed.
-    - **Note**: The app needs permission to control the mouse/keyboard (Run as Admin if TruTops is running as Admin).
+   - Install ODA File Converter from Open Design Alliance to filter new DWGs.
+   - The app will ask you to locate `ODAFileConverter.exe` if it is not found automatically.
+   - **Note**: The app needs permission to control the mouse/keyboard (Run as Admin if TruTops is running as Admin).
