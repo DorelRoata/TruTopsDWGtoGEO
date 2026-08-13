@@ -83,7 +83,6 @@ DEFAULT_CONFIG = {
         "select_top_left": [75, 209],        # Top-left corner of selection box
         "select_bottom_right": [3350, 1867], # Bottom-right corner of selection box
         "delete_selection": None,
-        "cleanup_color": None,
         "cleanup_delete": None,
     },
     "relative_click_locations": {},
@@ -574,8 +573,7 @@ class LocationSetupDialog(tk.Toplevel):
             "select_top_left": "Selection TOP-LEFT",
             "select_bottom_right": "Selection BOTTOM-RIGHT",
             "delete_selection": "Delete Selection button",
-            "cleanup_color": "Cleanup color checkbox",
-            "cleanup_delete": "Delete button in cleanup dialog",
+            "cleanup_delete": "OK button in cleanup dialog",
         }
 
         self.captured = {}
@@ -971,6 +969,7 @@ class AutomationRunner:
             hwnd = self.trutops_window["hwnd"]
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
             win32gui.SetForegroundWindow(hwnd)
+            self.app.after(0, self._restore_app_if_minimized)
             self._interruptible_delay(0.25)
             print("[FOCUS] Activated: {}".format(self.trutops_window["title"]))
             return True
@@ -978,6 +977,11 @@ class AutomationRunner:
         except Exception as e:
             print("[FOCUS] Error: {}".format(e))
             return False
+
+    def _restore_app_if_minimized(self):
+        """Keep D2G open behind TruTops while TruTops receives input focus."""
+        if self.app.state() == "iconic":
+            self.app.deiconify()
 
     def _window_rect(self):
         """Return the current TruTops rectangle, refreshing it after moves/resizes."""
@@ -1158,6 +1162,15 @@ class AutomationRunner:
         process = subprocess.Popen(['clip'], stdin=subprocess.PIPE)
         process.communicate(text.encode('utf-8'))
 
+    def _open_file_from_dialog(self, file_path):
+        """Open a queued filename from TruTops' current file dialog folder."""
+        file_name = os.path.basename(file_path)
+        self._copy_to_clipboard(file_name)
+        print("[CLIPBOARD] Copied filename: {}".format(file_name))
+        self._hotkey('ctrl', 'a', description="Select filename")
+        self._hotkey('ctrl', 'v', description="Paste DWG filename")
+        self._press('enter', "Open drawing")
+
     @staticmethod
     def _expected_geo_path(dwg_path):
         """Return the GEO path used by the existing same-folder workflow."""
@@ -1298,7 +1311,7 @@ class AutomationRunner:
         # Opening another drawing normally asks whether to save the current one.
         # If TruTops went directly to its file browser, do not click the old No
         # coordinates on top of that browser.
-        if self._dialog_kind() != "file":
+        if self._dialog_kind() == "warning":
             no_save_pos = self._resolve_location("no_save")
             if not no_save_pos:
                 return False, "No button location was not found"
@@ -1308,17 +1321,12 @@ class AutomationRunner:
             ):
                 return False, "DWG file browser did not appear"
         else:
-            print("[DIALOG] File browser already open; skipped No button")
+            print("[DIALOG] No save warning detected; continuing with file browser")
 
-        self._copy_to_clipboard(file_path)
-        print("[CLIPBOARD] Copied full path: {}".format(file_path))
-
-        def open_file():
-            self._hotkey('ctrl', 'a', description="Select filename")
-            self._hotkey('ctrl', 'v', description="Paste full DWG path")
-            self._press('enter', "Open drawing")
-
-        if not self._smart_action(open_file, "DWG import options"):
+        if not self._smart_action(
+            lambda: self._open_file_from_dialog(file_path),
+            "DWG import options",
+        ):
             return False, "DWG import options did not appear"
 
         import_timeout = max(
@@ -1541,7 +1549,7 @@ class ManualController:
 
     def start(self):
         self.listener = keyboard.GlobalHotKeys({
-            "<ctrl>+1": lambda: self.app.after(0, lambda: self.trigger("cleanup")),
+            "<ctrl>+1": lambda: self.app.after(0, lambda: self.trigger("clean_geo")),
             "<ctrl>+2": lambda: self.app.after(0, lambda: self.trigger("geo")),
             "<ctrl>+3": lambda: self.app.after(0, lambda: self.trigger("next")),
             "<ctrl>+<enter>": lambda: self.app.after(0, lambda: self.trigger("all")),
@@ -1567,10 +1575,10 @@ class ManualController:
         if self.app.automation.running:
             # The AutomationRunner owns Ctrl+1 through Ctrl+5 while a batch is active.
             return
-        if not self.app.files:
-            self.app.update_status("Select a project root first")
+        if action in ("next", "all") and not self.app.files:
+            self.app.update_status("Queue drawings before using Next")
             return
-        self._start_action(action, self._selected_index())
+        self._start_action(action, self._selected_index() if self.app.files else None)
 
     def _start_action(self, action, index):
         self.busy = True
@@ -1586,9 +1594,9 @@ class ManualController:
     def _run_action(self, action, index):
         try:
             self.app.automation._focus_trutops()
-            if action in ("cleanup", "all"):
+            if action in ("clean_geo", "all"):
                 self._cleanup()
-            if action in ("geo", "all") and not self.cancelled:
+            if action in ("clean_geo", "geo", "all") and not self.cancelled:
                 self._geo(index)
             if action in ("next", "all") and not self.cancelled:
                 self._open_next(index)
@@ -1621,16 +1629,16 @@ class ManualController:
 
     def _cleanup(self):
         self._click("delete_selection", "Opening cleanup")
-        self._click("cleanup_color", "Selecting cleanup color")
-        self._click("cleanup_delete", "Deleting cleanup geometry")
+        self._click("cleanup_delete", "Confirming preset cleanup")
 
     def _geo(self, index):
-        item = self.app.files[index]
-        geo_path = Path(item["geo"])
-        if geo_path.exists():
+        item = self.app.files[index] if index is not None else None
+        geo_path = Path(item["geo"]) if item else None
+        if geo_path and geo_path.exists():
             raise RuntimeError("GEO already exists; not overwritten: {}".format(geo_path))
 
-        self.app.after(0, lambda: self.app.update_file_status(index, "processing"))
+        if item:
+            self.app.after(0, lambda: self.app.update_file_status(index, "processing"))
         self._click("save_selected", "Starting GEO save")
         self._click("select_top_left", "Selecting part: first corner")
         self._click("select_bottom_right", "Selecting part: second corner")
@@ -1640,11 +1648,15 @@ class ManualController:
         self._wait(0.4)
         pyautogui.press("enter")
         self._wait(self.config.get("save_delay") or 2.0)
-        if not geo_path.exists():
+        if geo_path and not geo_path.exists():
             raise RuntimeError("Expected GEO was not created: {}".format(geo_path))
-        DwgProjectFilter.mark_geo_complete(item)
-        self.app.after(0, lambda: self.app.update_file_status(index, "done"))
-        self.app.after(0, lambda: self.app.update_status("GEO saved: " + geo_path.name))
+        if item:
+            DwgProjectFilter.mark_geo_complete(item)
+            self.app.after(0, lambda: self.app.update_file_status(index, "done"))
+            status = "GEO saved: " + geo_path.name
+        else:
+            status = "Cleanup and GEO actions completed"
+        self.app.after(0, lambda s=status: self.app.update_status(s))
 
     def _open_next(self, current_index):
         next_index = current_index + 1
@@ -1653,11 +1665,9 @@ class ManualController:
             return
         item = self.app.files[next_index]
         self._click("open_drawing", "Opening next drawing")
-        self._click("no_save", "Discarding current drawing changes")
-        self.app.automation._copy_to_clipboard(item["dwg"])
-        pyautogui.hotkey("ctrl", "v")
-        self._wait(0.3)
-        pyautogui.press("enter")
+        if self.app.automation._dialog_kind() == "warning":
+            self._click("no_save", "Discarding current drawing changes")
+        self.app.automation._open_file_from_dialog(item["dwg"])
         self._wait(1.0)
         pyautogui.press("enter")
         self._wait(self.config.get("import_delay") or 3.0)
@@ -1823,7 +1833,7 @@ class App(tk.Tk):
 
         tk.Label(
             mode_frame,
-            text="When stopped: Ctrl+1 Clean | Ctrl+2 GEO | Ctrl+3 Next | Ctrl+Enter All | Ctrl+Esc Stop",
+            text="When stopped: Ctrl+1 Clean + GEO | Ctrl+2 GEO Only | Ctrl+3 Next Drawing | Ctrl+Enter All | Ctrl+Esc Stop",
             bg=self.colors["bg_light"], fg=self.colors["highlight"],
             font=("Segoe UI", 9, "bold"),
         ).pack(anchor="w", pady=(8, 0))

@@ -29,6 +29,22 @@ class D2GLogicTests(unittest.TestCase):
             app.from_relative_position(relative, (500, 450, 1500, 950)),
         )
 
+    def test_file_dialog_pastes_only_filename(self):
+        runner = self.make_runner("skip_existing")
+        runner._copy_to_clipboard = mock.Mock()
+        runner._hotkey = mock.Mock()
+        runner._press = mock.Mock()
+
+        runner._open_file_from_dialog(r"C:\jobs\part.dwg")
+
+        runner._copy_to_clipboard.assert_called_once_with("part.dwg")
+        self.assertEqual(
+            [mock.call('ctrl', 'a', description="Select filename"),
+             mock.call('ctrl', 'v', description="Paste DWG filename")],
+            runner._hotkey.call_args_list,
+        )
+        runner._press.assert_called_once_with('enter', "Open drawing")
+
     @mock.patch("app.os.path.exists", return_value=True)
     def test_skip_existing_geo_policy(self, _exists):
         dwg = r"C:\jobs\part.dwg"
